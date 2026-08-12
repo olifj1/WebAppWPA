@@ -1,0 +1,12 @@
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+body { background: #111827; color: white; }
+.app { min-height: 100vh; min-height: 100dvh; display: grid; place-items: center; padding: 24px; }
+.card { width: min(100%, 420px); text-align: center; padding: 32px 24px; border-radius: 24px; background: #1f2937; box-shadow: 0 20px 50px rgba(0,0,0,.25); }
+.eyebrow { font-size: 12px; letter-spacing: .15em; opacity: .6; }
+h1 { margin: 8px 0 12px; }
+#count { font-size: 72px; font-weight: 700; margin: 12px 0 24px; }
+button { width: 100%; min-height: 56px; border: 0; border-radius: 14px; font-size: 20px; font-weight: 600; margin-top: 12px; background: #fff; color: #111827; }
+button:active { transform: scale(.98); }
+button.secondary { background: #374151; color: white; }
+.status { font-size: 13px; line-height: 1.5; opacity: .65; margin: 24px 0 0; }
