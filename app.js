@@ -1,5 +1,5 @@
 const countEl = document.getElementById("count");
-const addButton = document.getElementById("add");
+const changeButtons = document.querySelectorAll("[data-change]");
 const resetButton = document.getElementById("reset");
 
 let count = Number(localStorage.getItem("count") || 0);
@@ -9,9 +9,11 @@ function render() {
   localStorage.setItem("count", count);
 }
 
-addButton.addEventListener("click", () => {
-  count++;
-  render();
+changeButtons.forEach(button => {
+  button.addEventListener("click", () => {
+    count += Number(button.dataset.change);
+    render();
+  });
 });
 
 resetButton.addEventListener("click", () => {

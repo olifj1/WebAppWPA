@@ -1,4 +1,4 @@
-const CACHE = "tiny-pwa-v1";
+const CACHE = "tiny-pwa-v2";
 const FILES = ["./", "./index.html", "./style.css", "./app.js", "./manifest.json"];
 
 self.addEventListener("install", event => {
@@ -7,7 +7,13 @@ self.addEventListener("install", event => {
 });
 
 self.addEventListener("activate", event => {
-  event.waitUntil(self.clients.claim());
+  event.waitUntil(
+    caches.keys()
+      .then(keys => Promise.all(
+        keys.filter(key => key !== CACHE).map(key => caches.delete(key))
+      ))
+      .then(() => self.clients.claim())
+  );
 });
 
 self.addEventListener("fetch", event => {
