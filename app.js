@@ -49,9 +49,9 @@ const numberDown = $("#number-down");
 const numberUp = $("#number-up");
 const chosenNumberEl = $("#chosen-number");
 const tapNumber = $("#tap-number");
-const tapValue = $("#tap-value");
 const totalValue = $("#total-value");
 const equation = $("#equation");
+const multiplyEquation = $("#multiply-equation");
 const tapDots = $("#tap-dots");
 const tapCount = $("#tap-count");
 const numbersReset = $("#numbers-reset");
@@ -64,16 +64,18 @@ function renderNumbers() {
   const total = chosenNumber * taps;
 
   chosenNumberEl.textContent = chosenNumber;
-  tapValue.textContent = chosenNumber;
   totalValue.textContent = total;
   tapCount.textContent = `${taps} ${taps === 1 ? "tap" : "taps"}`;
 
   if (taps === 0) {
     equation.textContent = "Tap the button to begin";
+    multiplyEquation.textContent = "";
   } else if (taps <= 8) {
     equation.textContent = `${Array(taps).fill(chosenNumber).join(" + ")} = ${total}`;
+    multiplyEquation.textContent = `${taps} × ${chosenNumber} = ${total}`;
   } else {
     equation.textContent = `${chosenNumber} added ${taps} times = ${total}`;
+    multiplyEquation.textContent = `${taps} × ${chosenNumber} = ${total}`;
   }
 
   tapDots.innerHTML = "";
@@ -142,21 +144,34 @@ for (let i = 0; i < 60; i++) {
   clockTicks.appendChild(line);
 }
 
+const clockNumbers = $("#clock-numbers");
+for (let n = 1; n <= 12; n++) {
+  const angle = n * 30 * Math.PI / 180;
+  const radius = 98;
+  const x = 150 + Math.sin(angle) * radius;
+  const y = 150 - Math.cos(angle) * radius;
+  const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+  text.setAttribute("x", x);
+  text.setAttribute("y", y + 1);
+  text.textContent = n;
+  clockNumbers.appendChild(text);
+}
+
 let hour = Number(localStorage.getItem("clockHour") || 12);
 let minute = Number(localStorage.getItem("clockMinute") || 0);
 hourSlider.value = hour;
 minuteSlider.value = minute;
 
 const skyStops = [
-  { t: 0.00, c: [48, 72, 116] },
-  { t: 0.18, c: [67, 92, 137] },
+  { t: 0.00, c: [5, 8, 14] },
+  { t: 0.18, c: [28, 44, 78] },
   { t: 0.24, c: [232, 148, 124] },
   { t: 0.30, c: [247, 199, 118] },
   { t: 0.50, c: [248, 219, 145] },
   { t: 0.70, c: [243, 190, 108] },
   { t: 0.79, c: [224, 120, 102] },
-  { t: 0.86, c: [96, 91, 142] },
-  { t: 1.00, c: [48, 72, 116] }
+  { t: 0.86, c: [42, 51, 86] },
+  { t: 1.00, c: [5, 8, 14] }
 ];
 
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -171,7 +186,7 @@ function skyColor(normalizedDay) {
       return `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`;
     }
   }
-  return "rgb(48, 72, 116)";
+  return "rgb(5, 8, 14)";
 }
 
 function labelForTime(decimalHour) {
@@ -186,15 +201,18 @@ function labelForTime(decimalHour) {
 }
 
 function renderClock() {
-  const decimalHour = hour + minute / 60;
-  hourHand.style.transform = `rotate(${(decimalHour % 12) * 30}deg)`;
-  minuteHand.style.transform = `rotate(${minute * 6}deg)`;
+  const minuteForHands = minute === 60 ? 0 : minute;
+  const carriedHour = minute === 60 ? (hour + 1) % 24 : hour;
+  const decimalHour = carriedHour + minuteForHands / 60;
 
-  const hh = String(hour).padStart(2, "0");
-  const mm = String(minute).padStart(2, "0");
+  hourHand.style.transform = `rotate(${(decimalHour % 12) * 30}deg)`;
+  minuteHand.style.transform = `rotate(${minute === 60 ? 360 : minute * 6}deg)`;
+
+  const hh = String(carriedHour).padStart(2, "0");
+  const mm = String(minute === 60 ? 0 : minute).padStart(2, "0");
   digitalTime.textContent = `${hh}:${mm}`;
-  hourReadout.textContent = hh;
-  minuteReadout.textContent = mm;
+  hourReadout.textContent = String(hour).padStart(2, "0");
+  minuteReadout.textContent = String(minute).padStart(2, "0");
   dayLabel.textContent = labelForTime(decimalHour);
   clockScreen.style.backgroundColor = skyColor(decimalHour / 24);
 
@@ -255,15 +273,15 @@ const leaveTest = $("#leave-test");
 
 const difficultyInfo = {
   easy: {
-    note: "Adding and taking away with answers up to 10.",
+    note: "Mostly + and − to 10, with a little 2, 5 and 10 times-table practice.",
     points: 1
   },
   medium: {
-    note: "Adding and taking away with answers up to 20.",
+    note: "+ and − to 20, with simple multiplication mixed in.",
     points: 2
   },
   hard: {
-    note: "Bigger numbers with answers up to 50.",
+    note: "Bigger + and − problems, plus times tables up to 10 × 12.",
     points: 3
   }
 };
@@ -287,31 +305,51 @@ function randomInt(min, max) {
 }
 
 function makeAddition(maxAnswer) {
-  const answer = randomInt(2, maxAnswer);
-  const a = randomInt(0, answer);
+  const minPart = maxAnswer <= 10 ? 1 : 2;
+  const answer = randomInt(minPart * 2, maxAnswer);
+  const a = randomInt(minPart, answer - minPart);
   const b = answer - a;
   return { a, b, op: "+", answer };
 }
 
 function makeSubtraction(maxStart) {
-  const a = randomInt(1, maxStart);
-  const b = randomInt(0, a);
+  const minPart = maxStart <= 10 ? 1 : 2;
+  const a = randomInt(Math.max(minPart + 1, 3), maxStart);
+  const b = randomInt(minPart, a - minPart);
   return { a, b, op: "−", answer: a - b };
+}
+
+function makeMultiplication(maxTable, maxMultiplier) {
+  const a = randomInt(2, maxTable);
+  const b = randomInt(2, maxMultiplier);
+  return { a, b, op: "×", answer: a * b };
 }
 
 function generateProblem() {
   let problem;
-  const subtraction = Math.random() < 0.42;
+  const roll = Math.random();
 
   if (difficulty === "easy") {
-    problem = subtraction ? makeSubtraction(10) : makeAddition(10);
+    if (roll < 0.16) {
+      const tables = [2, 5, 10];
+      const a = tables[randomInt(0, tables.length - 1)];
+      const b = randomInt(2, 5);
+      problem = { a, b, op: "×", answer: a * b };
+    } else if (roll < 0.58) {
+      problem = makeAddition(10);
+    } else {
+      problem = makeSubtraction(10);
+    }
   } else if (difficulty === "medium") {
-    problem = subtraction ? makeSubtraction(20) : makeAddition(20);
+    if (roll < 0.28) problem = makeMultiplication(5, 10);
+    else if (roll < 0.64) problem = makeAddition(20);
+    else problem = makeSubtraction(20);
   } else {
-    problem = subtraction ? makeSubtraction(50) : makeAddition(50);
+    if (roll < 0.38) problem = makeMultiplication(10, 12);
+    else if (roll < 0.69) problem = makeAddition(50);
+    else problem = makeSubtraction(50);
   }
 
-  // Avoid repeating exactly the same question twice in a row where possible.
   if (
     currentProblem &&
     problem.a === currentProblem.a &&
@@ -562,6 +600,171 @@ leaveTest.addEventListener("click", () => {
 setDifficulty(difficulty);
 setDuration(testDuration);
 setSumMode(sumMode);
+
+// ----------------------------
+// Reading
+// ----------------------------
+const readingModeButtons = $$('[data-reading-mode]');
+const readingLevelButtons = $$('[data-reading-level]');
+const readingPrompt = $('#reading-prompt');
+const wordChoices = $('#word-choices');
+const readingFeedback = $('#reading-feedback');
+const readingNote = $('#reading-note');
+const newReadingButton = $('#new-reading');
+
+const readingLibraries = {
+  easy: [
+    'The red fox can run fast.',
+    'Mia has a blue hat.',
+    'The dog sat on the rug.',
+    'We can jump in the rain.',
+    'Dad made toast for us.',
+    'A frog sits by the pond.',
+    'The sun is warm today.',
+    'Ben can kick the ball.',
+    'The cat sleeps on my bed.',
+    'I can see three ducks.',
+    'The big bus is yellow.',
+    'Sam likes milk and toast.'
+  ],
+  medium: [
+    'The little rabbit hopped across the green field.',
+    'Maya found a shiny shell beside the sea.',
+    'After lunch, we walked to the busy park.',
+    'The sleepy kitten curled up inside the basket.',
+    'A bright rainbow appeared after the heavy rain.',
+    'Tom carried his muddy boots into the kitchen.',
+    'We planted tiny seeds in the garden yesterday.',
+    'The friendly dragon hid behind the old castle.',
+    'Lucy packed an apple and a sandwich for lunch.',
+    'The moon looked bright above the quiet houses.',
+    'Our class made paper boats and floated them outside.',
+    'A small bird landed softly on the wooden fence.'
+  ],
+  hard: [
+    'Although the wind was strong, the children kept flying their colourful kite.',
+    'Before bedtime, Oliver carefully placed his favourite book back on the shelf.',
+    'The curious squirrel hurried along the branch and disappeared behind the leaves.',
+    'When the rain finally stopped, puddles sparkled across the playground.',
+    'Sophie whispered quietly because her baby brother was sleeping upstairs.',
+    'At the museum, we discovered a huge skeleton from a dinosaur that lived long ago.',
+    'The excited puppy chased the rolling ball until it vanished beneath the sofa.',
+    'After mixing the flour and eggs, we waited patiently for the cake to bake.',
+    'A narrow path twisted through the woods towards a small wooden bridge.',
+    'Ella wore her warmest coat because frost covered the grass that morning.',
+    'During the journey, we counted red cars, blue lorries and three yellow buses.',
+    'The pirate opened the ancient map and searched for the hidden island.'
+  ]
+};
+
+const readingNotes = {
+  easy: 'Short, familiar sentences with simple words.',
+  medium: 'Longer sentences with more descriptive words.',
+  hard: 'Longer sentences with richer vocabulary and more complex phrasing.'
+};
+
+const readingTests = {
+  easy: [
+    { sentence: 'The cat ___ on the mat.', answer: 'sat', choices: ['sat','sun','red','hop'] },
+    { sentence: 'I can see a ___ duck.', answer: 'yellow', choices: ['yellow','run','milk','bed'] },
+    { sentence: 'Ben can ___ the ball.', answer: 'kick', choices: ['kick','hat','rain','frog'] },
+    { sentence: 'The sun is ___ today.', answer: 'warm', choices: ['warm','bus','three','pond'] },
+    { sentence: 'We ___ in the park.', answer: 'play', choices: ['play','blue','toast','fish'] }
+  ],
+  medium: [
+    { sentence: 'The rabbit hopped across the green ___.', answer: 'field', choices: ['field','shell','basket','lunch'] },
+    { sentence: 'Maya found a shiny ___ beside the sea.', answer: 'shell', choices: ['shell','field','boots','moon'] },
+    { sentence: 'A bright rainbow appeared after the ___.', answer: 'rain', choices: ['rain','garden','castle','book'] },
+    { sentence: 'The kitten curled up inside the ___.', answer: 'basket', choices: ['basket','park','fence','seed'] },
+    { sentence: 'We planted tiny seeds in the ___.', answer: 'garden', choices: ['garden','kitchen','sea','bus'] }
+  ],
+  hard: [
+    { sentence: 'The curious squirrel hurried along the ___.', answer: 'branch', choices: ['branch','puddle','museum','bridge'] },
+    { sentence: 'We waited patiently for the cake to ___.', answer: 'bake', choices: ['bake','whisper','count','twist'] },
+    { sentence: 'A narrow path twisted through the ___.', answer: 'woods', choices: ['woods','sofa','shelf','island'] },
+    { sentence: 'Frost covered the grass that ___.', answer: 'morning', choices: ['morning','journey','pirate','skeleton'] },
+    { sentence: 'The pirate searched for the hidden ___.', answer: 'island', choices: ['island','leaves','coat','flour'] }
+  ]
+};
+
+let readingMode = localStorage.getItem('readingMode') || 'read';
+let readingLevel = localStorage.getItem('readingLevel') || 'easy';
+let lastReadingIndex = -1;
+let activeReadingTest = null;
+
+function setReadingMode(mode) {
+  readingMode = mode;
+  localStorage.setItem('readingMode', mode);
+  readingModeButtons.forEach(button => button.classList.toggle('active', button.dataset.readingMode === mode));
+  generateReading();
+}
+
+function setReadingLevel(level) {
+  readingLevel = level;
+  localStorage.setItem('readingLevel', level);
+  readingLevelButtons.forEach(button => button.classList.toggle('active', button.dataset.readingLevel === level));
+  readingNote.textContent = readingNotes[level];
+  lastReadingIndex = -1;
+  generateReading();
+}
+
+function generateReading() {
+  readingFeedback.classList.remove('good','bad');
+  wordChoices.innerHTML = '';
+
+  if (readingMode === 'read') {
+    const library = readingLibraries[readingLevel];
+    let index = randomInt(0, library.length - 1);
+    if (library.length > 1 && index === lastReadingIndex) index = (index + 1) % library.length;
+    lastReadingIndex = index;
+    readingPrompt.textContent = library[index];
+    wordChoices.classList.add('hidden');
+    readingFeedback.textContent = 'Read it out loud.';
+    newReadingButton.textContent = 'New Sentence';
+    return;
+  }
+
+  const items = readingTests[readingLevel];
+  activeReadingTest = items[randomInt(0, items.length - 1)];
+  const parts = activeReadingTest.sentence.split('___');
+  readingPrompt.innerHTML = `${parts[0]}<span class="blank">?</span>${parts[1] || ''}`;
+  readingFeedback.textContent = 'Choose the word that fits.';
+  wordChoices.classList.remove('hidden');
+  newReadingButton.textContent = 'New Question';
+
+  const shuffled = [...activeReadingTest.choices].sort(() => Math.random() - 0.5);
+  shuffled.forEach(word => {
+    const button = document.createElement('button');
+    button.className = 'word-choice';
+    button.textContent = word;
+    button.addEventListener('click', () => checkReadingChoice(button, word));
+    wordChoices.appendChild(button);
+  });
+}
+
+function checkReadingChoice(button, word) {
+  if (!activeReadingTest) return;
+  const buttons = wordChoices.querySelectorAll('.word-choice');
+  buttons.forEach(b => b.disabled = true);
+  if (word === activeReadingTest.answer) {
+    button.classList.add('correct');
+    readingFeedback.classList.add('good');
+    readingFeedback.textContent = 'Yes — that fits! ★';
+  } else {
+    button.classList.add('wrong');
+    readingFeedback.classList.add('bad');
+    readingFeedback.textContent = `Good try — the word is “${activeReadingTest.answer}”.`;
+    buttons.forEach(b => {
+      if (b.textContent === activeReadingTest.answer) b.classList.add('correct');
+    });
+  }
+}
+
+readingModeButtons.forEach(button => button.addEventListener('click', () => setReadingMode(button.dataset.readingMode)));
+readingLevelButtons.forEach(button => button.addEventListener('click', () => setReadingLevel(button.dataset.readingLevel)));
+newReadingButton.addEventListener('click', generateReading);
+setReadingLevel(readingLevel);
+setReadingMode(readingMode);
 
 // ----------------------------
 // PWA service worker / update handling

@@ -1,7 +1,7 @@
 {
   "name": "Learning Play",
   "short_name": "Learning Play",
-  "description": "Simple tactile learning activities for numbers, telling the time and sums.",
+  "description": "Simple tactile learning activities for times tables, telling the time, sums and reading.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
