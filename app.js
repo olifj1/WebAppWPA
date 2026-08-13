@@ -1,28 +1,16 @@
-const countEl = document.getElementById("count");
-const changeButtons = document.querySelectorAll("[data-change]");
-const resetButton = document.getElementById("reset");
-
-let count = Number(localStorage.getItem("count") || 0);
-
-function render() {
-  countEl.textContent = count;
-  localStorage.setItem("count", count);
-}
-
-changeButtons.forEach(button => {
-  button.addEventListener("click", () => {
-    count += Number(button.dataset.change);
-    render();
-  });
-});
-
-resetButton.addEventListener("click", () => {
-  count = 0;
-  render();
-});
-
-render();
-
-if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./sw.js").catch(console.error);
-}
+const tabs=document.querySelectorAll('.tab'),screens=document.querySelectorAll('.screen');
+tabs.forEach(tab=>tab.addEventListener('click',()=>{const target=tab.dataset.screen;tabs.forEach(t=>{const a=t===tab;t.classList.toggle('active',a);a?t.setAttribute('aria-current','page'):t.removeAttribute('aria-current')});screens.forEach(s=>s.classList.toggle('active',s.id===target));localStorage.setItem('learningPlayScreen',target)}));
+const savedScreen=localStorage.getItem('learningPlayScreen');if(savedScreen){const t=document.querySelector(`[data-screen="${savedScreen}"]`);if(t)t.click()}
+const numberDown=document.getElementById('number-down'),numberUp=document.getElementById('number-up'),chosenNumberEl=document.getElementById('chosen-number'),tapNumber=document.getElementById('tap-number'),tapValue=document.getElementById('tap-value'),totalValue=document.getElementById('total-value'),equation=document.getElementById('equation'),tapDots=document.getElementById('tap-dots'),tapCount=document.getElementById('tap-count'),numbersReset=document.getElementById('numbers-reset');
+let chosenNumber=Number(localStorage.getItem('chosenNumber')||4),taps=Number(localStorage.getItem('numberTaps')||0);const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
+function renderNumbers(){chosenNumber=clamp(chosenNumber,1,12);const total=chosenNumber*taps;chosenNumberEl.textContent=chosenNumber;tapValue.textContent=chosenNumber;totalValue.textContent=total;tapCount.textContent=`${taps} ${taps===1?'tap':'taps'}`;equation.textContent=taps===0?'Tap the button to begin':taps<=8?Array(taps).fill(chosenNumber).join(' + ')+` = ${total}`:`${chosenNumber} added ${taps} times = ${total}`;tapDots.innerHTML='';for(let i=0;i<Math.min(taps,24);i++){const dot=document.createElement('span');dot.className='tap-dot';tapDots.appendChild(dot)}if(taps>24){const more=document.createElement('span');more.textContent=`+${taps-24}`;more.style.cssText='font-size:12px;font-weight:800;opacity:.55;align-self:center';tapDots.appendChild(more)}localStorage.setItem('chosenNumber',chosenNumber);localStorage.setItem('numberTaps',taps)}
+function changeChosenNumber(d){chosenNumber=clamp(chosenNumber+d,1,12);taps=0;renderNumbers()}numberDown.addEventListener('click',()=>changeChosenNumber(-1));numberUp.addEventListener('click',()=>changeChosenNumber(1));tapNumber.addEventListener('click',()=>{taps++;renderNumbers()});numbersReset.addEventListener('click',()=>{taps=0;renderNumbers()});renderNumbers();
+const hourSlider=document.getElementById('hour-slider'),minuteSlider=document.getElementById('minute-slider'),hourReadout=document.getElementById('hour-readout'),minuteReadout=document.getElementById('minute-readout'),hourHand=document.getElementById('hour-hand'),minuteHand=document.getElementById('minute-hand'),digitalTime=document.getElementById('digital-time'),dayLabel=document.getElementById('day-label'),clockScreen=document.getElementById('clock-screen'),clockTicks=document.getElementById('clock-ticks');
+for(let i=0;i<60;i++){const a=i*6*Math.PI/180,major=i%5===0,outer=116,inner=major?104:110;const line=document.createElementNS('http://www.w3.org/2000/svg','line');line.setAttribute('x1',150+Math.sin(a)*inner);line.setAttribute('y1',150-Math.cos(a)*inner);line.setAttribute('x2',150+Math.sin(a)*outer);line.setAttribute('y2',150-Math.cos(a)*outer);line.setAttribute('class',major?'tick major':'tick');clockTicks.appendChild(line)}
+let hour=Number(localStorage.getItem('clockHour')||12),minute=Number(localStorage.getItem('clockMinute')||0);hourSlider.value=hour;minuteSlider.value=minute;
+const skyStops=[{t:0,c:[48,72,116]},{t:.18,c:[67,92,137]},{t:.24,c:[232,148,124]},{t:.30,c:[247,199,118]},{t:.50,c:[248,219,145]},{t:.70,c:[243,190,108]},{t:.79,c:[224,120,102]},{t:.86,c:[96,91,142]},{t:1,c:[48,72,116]}];const lerp=(a,b,t)=>a+(b-a)*t;
+function skyColor(n){for(let i=0;i<skyStops.length-1;i++){const a=skyStops[i],b=skyStops[i+1];if(n>=a.t&&n<=b.t){const lt=(n-a.t)/(b.t-a.t),rgb=a.c.map((v,j)=>Math.round(lerp(v,b.c[j],lt)));return `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`}}return'rgb(48,72,116)'}
+function labelForTime(h){if(h<5)return'Night';if(h<7)return'Sunrise';if(h<11.5)return'Morning';if(h<13.5)return'Midday';if(h<17.5)return'Afternoon';if(h<20)return'Sunset';if(h<22)return'Evening';return'Night'}
+function renderClock(){const dh=hour+minute/60;hourHand.style.transform=`rotate(${(dh%12)*30}deg)`;minuteHand.style.transform=`rotate(${minute*6}deg)`;const hh=String(hour).padStart(2,'0'),mm=String(minute).padStart(2,'0');digitalTime.textContent=`${hh}:${mm}`;hourReadout.textContent=hh;minuteReadout.textContent=mm;dayLabel.textContent=labelForTime(dh);clockScreen.style.backgroundColor=skyColor(dh/24);const page=document.getElementById('clock-page'),dark=dh<6||dh>=20.5;page.style.color=dark?'#f8fafc':'#27313c';page.querySelector('.subhead').style.color=dark?'rgba(248,250,252,.72)':'rgba(39,49,60,.68)';localStorage.setItem('clockHour',hour);localStorage.setItem('clockMinute',minute)}
+hourSlider.addEventListener('input',()=>{hour=Number(hourSlider.value);renderClock()});minuteSlider.addEventListener('input',()=>{minute=Number(minuteSlider.value);renderClock()});renderClock();
+if('serviceWorker'in navigator){window.addEventListener('load',async()=>{try{const reg=await navigator.serviceWorker.register('./sw.js');reg.update();navigator.serviceWorker.addEventListener('controllerchange',()=>{if(!sessionStorage.getItem('reloadedForUpdate')){sessionStorage.setItem('reloadedForUpdate','1');location.reload()}})}catch(e){console.error(e)}})}
