@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <meta name="theme-color" content="#f5c56b">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -15,8 +15,10 @@
 <body>
   <div class="app-shell">
     <main class="screen-wrap">
+
+      <!-- NUMBERS -->
       <section class="screen active" id="numbers-screen" aria-labelledby="numbers-title">
-        <div class="numbers-page">
+        <div class="page numbers-page">
           <header class="page-header">
             <p class="kicker">LEARNING PLAY</p>
             <h1 id="numbers-title">Multiply</h1>
@@ -49,8 +51,9 @@
         </div>
       </section>
 
+      <!-- CLOCK -->
       <section class="screen" id="clock-screen" aria-labelledby="clock-title">
-        <div class="clock-page" id="clock-page">
+        <div class="page clock-page" id="clock-page">
           <header class="page-header clock-header">
             <p class="kicker">LEARNING PLAY</p>
             <h1 id="clock-title">Tell the Time</h1>
@@ -91,13 +94,106 @@
           </div>
         </div>
       </section>
+
+      <!-- SUMS -->
+      <section class="screen" id="sums-screen" aria-labelledby="sums-title">
+        <div class="page sums-page">
+          <header class="page-header sums-header">
+            <p class="kicker">LEARNING PLAY</p>
+            <h1 id="sums-title">Sums</h1>
+            <p class="subhead">Practise at your own pace, or race the timer.</p>
+          </header>
+
+          <div class="mode-switch" role="group" aria-label="Sum mode">
+            <button class="mode-button active" data-sum-mode="practice">Practice</button>
+            <button class="mode-button" data-sum-mode="test">Test</button>
+          </div>
+
+          <div id="sum-setup" class="sum-setup">
+            <div class="choice-title">Difficulty</div>
+            <div class="choice-row difficulty-row">
+              <button class="choice-button active" data-difficulty="easy">Easy</button>
+              <button class="choice-button" data-difficulty="medium">Medium</button>
+              <button class="choice-button" data-difficulty="hard">Hard</button>
+            </div>
+            <p class="difficulty-note" id="difficulty-note">Adding and taking away with answers up to 10.</p>
+
+            <div class="test-options hidden" id="test-options">
+              <div class="choice-title">Time</div>
+              <div class="choice-row duration-row">
+                <button class="choice-button" data-duration="30">30 sec</button>
+                <button class="choice-button active" data-duration="60">1 min</button>
+                <button class="choice-button" data-duration="120">2 min</button>
+              </div>
+              <div class="best-score" id="best-score">Best: —</div>
+              <button class="primary-action" id="start-test">Start Test</button>
+            </div>
+          </div>
+
+          <div class="sum-play" id="sum-play">
+            <div class="test-topline hidden" id="test-topline">
+              <div class="timer-pill"><span>TIME</span><strong id="timer-value">1:00</strong></div>
+              <div class="score-pill"><span>SCORE</span><strong id="live-score">0</strong></div>
+            </div>
+
+            <div class="sum-card">
+              <div class="sum-question" id="sum-question">4 + 3 = ?</div>
+              <div class="answer-display" id="answer-display" aria-live="polite">?</div>
+              <div class="sum-feedback" id="sum-feedback">Tap the numbers below</div>
+            </div>
+
+            <div class="keypad" aria-label="Answer keypad">
+              <button class="key" data-digit="1">1</button>
+              <button class="key" data-digit="2">2</button>
+              <button class="key" data-digit="3">3</button>
+              <button class="key" data-digit="4">4</button>
+              <button class="key" data-digit="5">5</button>
+              <button class="key" data-digit="6">6</button>
+              <button class="key" data-digit="7">7</button>
+              <button class="key" data-digit="8">8</button>
+              <button class="key" data-digit="9">9</button>
+              <button class="key key-clear" id="answer-clear">⌫</button>
+              <button class="key" data-digit="0">0</button>
+              <button class="key key-check" id="answer-check">✓</button>
+            </div>
+
+            <div class="sum-actions">
+              <button class="secondary-action" id="new-sum">New Sum</button>
+              <button class="secondary-action hidden" id="pass-sum">Pass</button>
+            </div>
+          </div>
+
+          <div class="test-results hidden" id="test-results">
+            <div class="results-burst">★</div>
+            <h2>Time's up!</h2>
+            <div class="result-score"><span>Score</span><strong id="result-score">0</strong></div>
+            <div class="result-stats">
+              <div><strong id="result-correct">0</strong><span>correct</span></div>
+              <div><strong id="result-passed">0</strong><span>passed</span></div>
+              <div><strong id="result-best">0</strong><span>best</span></div>
+            </div>
+            <p id="result-message">Great work!</p>
+            <button class="primary-action" id="try-again">Try Again</button>
+            <button class="text-button" id="leave-test">Back to Practice</button>
+          </div>
+        </div>
+      </section>
+
     </main>
 
     <nav class="tab-bar" aria-label="Learning activities">
-      <button class="tab active" data-screen="numbers-screen" aria-current="page"><span class="tab-icon">×</span><span>Numbers</span></button>
-      <button class="tab" data-screen="clock-screen"><span class="tab-icon clock-icon">◷</span><span>Clock</span></button>
+      <button class="tab active" data-screen="numbers-screen" aria-current="page">
+        <span class="tab-icon">×</span><span>Numbers</span>
+      </button>
+      <button class="tab" data-screen="clock-screen">
+        <span class="tab-icon clock-icon">◷</span><span>Clock</span>
+      </button>
+      <button class="tab" data-screen="sums-screen">
+        <span class="tab-icon sum-icon">+</span><span>Sums</span>
+      </button>
     </nav>
   </div>
+
   <script src="app.js"></script>
 </body>
 </html>
