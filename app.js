@@ -766,6 +766,415 @@ newReadingButton.addEventListener('click', generateReading);
 setReadingLevel(readingLevel);
 setReadingMode(readingMode);
 
+
+// ----------------------------
+// Coding / rover programming
+// ----------------------------
+const codingBoard = $("#coding-board");
+const codingStatus = $("#coding-status");
+const codingLevelButtons = $$("[data-coding-level]");
+const commandButtons = $$("[data-command]");
+const programTimeline = $("#program-timeline");
+const programCount = $("#program-count");
+const codingRun = $("#coding-run");
+const codingClear = $("#coding-clear");
+const codingUndo = $("#coding-undo");
+const newCodingPuzzle = $("#new-coding-puzzle");
+const codingResult = $("#coding-result");
+const codingStars = $("#coding-stars");
+const codingResultTitle = $("#coding-result-title");
+const codingResultDetail = $("#coding-result-detail");
+
+const CODING_ROWS = 7;
+const CODING_COLS = 6;
+const codingLevelInfo = {
+  easy:   { obstacles: 6,  minOptimal: 5 },
+  medium: { obstacles: 9,  minOptimal: 7 },
+  hard:   { obstacles: 12, minOptimal: 9 }
+};
+
+const directionVectors = [
+  [-1, 0],
+  [0, 1],
+  [1, 0],
+  [0, -1]
+];
+
+const commandGlyphs = {
+  forward: "↑",
+  back: "↓",
+  left: "↶",
+  right: "↷"
+};
+
+let codingLevel = localStorage.getItem("codingLevel") || "easy";
+let codingPuzzle = null;
+let codingProgram = [];
+let codingRunning = false;
+let codingRunToken = 0;
+
+function cellKey(row, col) {
+  return `${row},${col}`;
+}
+
+function codingInBounds(row, col) {
+  return row >= 0 && row < CODING_ROWS && col >= 0 && col < CODING_COLS;
+}
+
+function codingBlocked(row, col, puzzle = codingPuzzle) {
+  return puzzle.obstacles.has(cellKey(row, col));
+}
+
+function nextCodingState(state, command, puzzle = codingPuzzle) {
+  let { row, col, dir } = state;
+
+  if (command === "left") {
+    dir = (dir + 3) % 4;
+    return { row, col, dir, collision: false };
+  }
+
+  if (command === "right") {
+    dir = (dir + 1) % 4;
+    return { row, col, dir, collision: false };
+  }
+
+  const [dr, dc] = directionVectors[dir];
+  const sign = command === "back" ? -1 : 1;
+  const nr = row + dr * sign;
+  const nc = col + dc * sign;
+
+  if (!codingInBounds(nr, nc) || codingBlocked(nr, nc, puzzle)) {
+    return { row, col, dir, collision: true };
+  }
+
+  return { row: nr, col: nc, dir, collision: false };
+}
+
+function codingShortestProgram(puzzle) {
+  const start = { row: puzzle.start.row, col: puzzle.start.col, dir: 0 };
+  const queue = [{ state: start, path: [] }];
+  const seen = new Set([`${start.row},${start.col},${start.dir}`]);
+  const commands = ["forward", "back", "left", "right"];
+
+  while (queue.length) {
+    const current = queue.shift();
+    const s = current.state;
+
+    if (s.row === puzzle.goal.row && s.col === puzzle.goal.col) {
+      return current.path;
+    }
+
+    for (const command of commands) {
+      const n = nextCodingState(s, command, puzzle);
+      if (n.collision) continue;
+
+      const key = `${n.row},${n.col},${n.dir}`;
+      if (seen.has(key)) continue;
+
+      seen.add(key);
+      queue.push({ state: n, path: [...current.path, command] });
+    }
+  }
+
+  return null;
+}
+
+function buildCodingPuzzle() {
+  codingRunToken += 1;
+  codingRunning = false;
+  codingProgram = [];
+  codingResult.classList.add("hidden");
+
+  const info = codingLevelInfo[codingLevel];
+  let puzzle = null;
+
+  for (let attempt = 0; attempt < 250; attempt++) {
+    const start = { row: CODING_ROWS - 1, col: randomInt(0, CODING_COLS - 1) };
+    const goal = { row: 0, col: randomInt(0, CODING_COLS - 1) };
+    const obstacles = new Set();
+
+    while (obstacles.size < info.obstacles) {
+      const row = randomInt(1, CODING_ROWS - 2);
+      const col = randomInt(0, CODING_COLS - 1);
+      obstacles.add(cellKey(row, col));
+    }
+
+    const candidate = { start, goal, obstacles };
+    const solution = codingShortestProgram(candidate);
+
+    if (solution && solution.length >= info.minOptimal && solution.length <= 24) {
+      candidate.solution = solution;
+      puzzle = candidate;
+      break;
+    }
+  }
+
+  if (!puzzle) {
+    const start = { row: 6, col: 2 };
+    const goal = { row: 0, col: 4 };
+    const obstacles = new Set(["4,2", "4,3", "2,3", "2,4", "1,1"]);
+    puzzle = { start, goal, obstacles };
+    puzzle.solution = codingShortestProgram(puzzle);
+  }
+
+  codingPuzzle = puzzle;
+  codingPuzzle.state = {
+    row: puzzle.start.row,
+    col: puzzle.start.col,
+    dir: 0
+  };
+
+  codingStatus.classList.remove("good", "bad");
+  codingStatus.textContent = `Can you reach the flag? Best route: ${puzzle.solution.length} commands.`;
+  renderCodingBoard();
+  renderCodingProgram();
+  setCodingControlsEnabled(true);
+}
+
+function renderCodingBoard() {
+  codingBoard.innerHTML = "";
+
+  for (let row = 0; row < CODING_ROWS; row++) {
+    for (let col = 0; col < CODING_COLS; col++) {
+      const cell = document.createElement("div");
+      cell.className = "grid-cell";
+
+      if (codingPuzzle.obstacles.has(cellKey(row, col))) {
+        cell.classList.add("obstacle");
+      }
+
+      const isStart = row === codingPuzzle.start.row && col === codingPuzzle.start.col;
+      const isGoal = row === codingPuzzle.goal.row && col === codingPuzzle.goal.col;
+
+      if (isStart) {
+        cell.classList.add("start-cell");
+        const label = document.createElement("span");
+        label.className = "cell-label";
+        label.textContent = "START";
+        cell.appendChild(label);
+      }
+
+      if (isGoal) {
+        cell.classList.add("goal-cell");
+        const flag = document.createElement("span");
+        flag.className = "goal-flag";
+        flag.textContent = "🏁";
+        cell.appendChild(flag);
+      }
+
+      if (row === codingPuzzle.state.row && col === codingPuzzle.state.col) {
+        const rover = document.createElement("span");
+        rover.className = `rover dir-${codingPuzzle.state.dir}`;
+        rover.id = "coding-rover";
+        cell.appendChild(rover);
+      }
+
+      codingBoard.appendChild(cell);
+    }
+  }
+}
+
+function renderCodingProgram(activeIndex = -1, doneThrough = -1) {
+  programCount.textContent = codingProgram.length;
+  programTimeline.innerHTML = "";
+
+  if (!codingProgram.length) {
+    const empty = document.createElement("span");
+    empty.className = "program-empty";
+    empty.textContent = "Tap a command below";
+    programTimeline.appendChild(empty);
+    return;
+  }
+
+  codingProgram.forEach((command, index) => {
+    const step = document.createElement("span");
+    step.className = "program-step";
+    step.textContent = commandGlyphs[command];
+    step.title = command;
+
+    if (index === activeIndex) step.classList.add("running");
+    else if (index <= doneThrough) step.classList.add("done");
+
+    programTimeline.appendChild(step);
+  });
+
+  if (activeIndex >= 0 && programTimeline.children[activeIndex]) {
+    programTimeline.children[activeIndex].scrollIntoView({
+      behavior: "smooth",
+      inline: "center",
+      block: "nearest"
+    });
+  }
+}
+
+function addCodingCommand(command) {
+  if (codingRunning || codingProgram.length >= 30) return;
+  codingProgram.push(command);
+
+  codingStatus.classList.remove("good", "bad");
+  codingStatus.textContent = codingProgram.length >= 30
+    ? "Program full — press Run or remove a step."
+    : "Build your program, then press Run.";
+
+  renderCodingProgram();
+  programTimeline.scrollLeft = programTimeline.scrollWidth;
+}
+
+function setCodingControlsEnabled(enabled) {
+  commandButtons.forEach(button => button.disabled = !enabled);
+  codingUndo.disabled = !enabled;
+  codingClear.disabled = !enabled;
+  codingRun.disabled = !enabled;
+  newCodingPuzzle.disabled = !enabled;
+  codingLevelButtons.forEach(button => button.disabled = !enabled);
+}
+
+function resetCodingRover() {
+  codingPuzzle.state = {
+    row: codingPuzzle.start.row,
+    col: codingPuzzle.start.col,
+    dir: 0
+  };
+  renderCodingBoard();
+}
+
+function wait(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function runCodingProgram() {
+  if (codingRunning || !codingProgram.length) {
+    if (!codingProgram.length) {
+      codingStatus.classList.remove("good");
+      codingStatus.classList.add("bad");
+      codingStatus.textContent = "Add some commands first.";
+    }
+    return;
+  }
+
+  codingRunning = true;
+  const token = ++codingRunToken;
+  codingResult.classList.add("hidden");
+  setCodingControlsEnabled(false);
+  resetCodingRover();
+
+  let completedIndex = -1;
+
+  for (let i = 0; i < codingProgram.length; i++) {
+    if (token !== codingRunToken) return;
+
+    renderCodingProgram(i, completedIndex);
+    const next = nextCodingState(codingPuzzle.state, codingProgram[i]);
+
+    if (next.collision) {
+      codingStatus.classList.remove("good");
+      codingStatus.classList.add("bad");
+      codingStatus.textContent = "Bonk! The rover hit something.";
+
+      const rover = $("#coding-rover");
+      if (rover) rover.classList.add("bump");
+
+      await wait(430);
+      renderCodingProgram(-1, completedIndex);
+      codingRunning = false;
+      setCodingControlsEnabled(true);
+      return;
+    }
+
+    codingPuzzle.state = {
+      row: next.row,
+      col: next.col,
+      dir: next.dir
+    };
+
+    renderCodingBoard();
+    completedIndex = i;
+    await wait(360);
+
+    if (
+      codingPuzzle.state.row === codingPuzzle.goal.row &&
+      codingPuzzle.state.col === codingPuzzle.goal.col
+    ) {
+      finishCodingSuccess(i + 1);
+      return;
+    }
+  }
+
+  renderCodingProgram(-1, completedIndex);
+  codingStatus.classList.remove("good");
+  codingStatus.classList.add("bad");
+  codingStatus.textContent = "Not there yet — change the program and try again.";
+  codingRunning = false;
+  setCodingControlsEnabled(true);
+}
+
+function finishCodingSuccess(usedCommands) {
+  codingRunning = false;
+  renderCodingProgram(-1, usedCommands - 1);
+  codingStatus.classList.remove("bad");
+  codingStatus.classList.add("good");
+  codingStatus.textContent = "You reached the flag!";
+
+  const optimal = codingPuzzle.solution.length;
+  const extra = usedCommands - optimal;
+  const stars = extra <= 1 ? 3 : extra <= 4 ? 2 : 1;
+
+  codingStars.textContent = "★".repeat(stars) + "☆".repeat(3 - stars);
+  codingResultTitle.textContent = "You made it!";
+  codingResultDetail.textContent =
+    usedCommands === optimal
+      ? `Perfect route — ${usedCommands} commands.`
+      : `${usedCommands} commands. Best possible is ${optimal}.`;
+
+  codingResult.classList.remove("hidden");
+  setCodingControlsEnabled(true);
+}
+
+commandButtons.forEach(button => {
+  button.addEventListener("click", () => addCodingCommand(button.dataset.command));
+});
+
+codingUndo.addEventListener("click", () => {
+  if (codingRunning || !codingProgram.length) return;
+  codingProgram.pop();
+  renderCodingProgram();
+});
+
+codingClear.addEventListener("click", () => {
+  if (codingRunning) return;
+  codingProgram = [];
+  codingResult.classList.add("hidden");
+  resetCodingRover();
+  codingStatus.classList.remove("good", "bad");
+  codingStatus.textContent = "Build your program, then press Run.";
+  renderCodingProgram();
+});
+
+codingRun.addEventListener("click", runCodingProgram);
+newCodingPuzzle.addEventListener("click", buildCodingPuzzle);
+
+codingLevelButtons.forEach(button => {
+  button.addEventListener("click", () => {
+    if (codingRunning) return;
+
+    codingLevel = button.dataset.codingLevel;
+    localStorage.setItem("codingLevel", codingLevel);
+
+    codingLevelButtons.forEach(b => {
+      b.classList.toggle("active", b.dataset.codingLevel === codingLevel);
+    });
+
+    buildCodingPuzzle();
+  });
+});
+
+codingLevelButtons.forEach(button => {
+  button.classList.toggle("active", button.dataset.codingLevel === codingLevel);
+});
+
+buildCodingPuzzle();
+
+
 // ----------------------------
 // PWA service worker / update handling
 // ----------------------------

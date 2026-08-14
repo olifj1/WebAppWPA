@@ -209,6 +209,69 @@
         </div>
       </section>
 
+      <!-- CODING -->
+      <section class="screen" id="coding-screen" aria-labelledby="coding-title">
+        <div class="page coding-page">
+          <header class="page-header coding-header">
+            <p class="kicker">LEARNING PLAY</p>
+            <h1 id="coding-title">Coding</h1>
+            <p class="subhead">Build a program to guide the rover to the flag.</p>
+          </header>
+
+          <div class="coding-topbar">
+            <div class="coding-levels" role="group" aria-label="Coding difficulty">
+              <button class="coding-level active" data-coding-level="easy">Easy</button>
+              <button class="coding-level" data-coding-level="medium">Medium</button>
+              <button class="coding-level" data-coding-level="hard">Hard</button>
+            </div>
+            <button class="new-puzzle-button" id="new-coding-puzzle">New</button>
+          </div>
+
+          <div class="coding-board-wrap">
+            <div class="coding-board" id="coding-board" aria-label="Coding puzzle grid"></div>
+          </div>
+
+          <div class="coding-status" id="coding-status">Build your program, then press Run.</div>
+
+          <div class="program-strip">
+            <div class="program-heading">
+              <span>YOUR PROGRAM</span>
+              <strong id="program-count">0</strong>
+            </div>
+            <div class="program-timeline" id="program-timeline" aria-live="polite">
+              <span class="program-empty">Tap a command below</span>
+            </div>
+          </div>
+
+          <div class="coding-controls">
+            <button class="command-button" data-command="forward">
+              <span class="command-icon">↑</span><span>Forward</span>
+            </button>
+            <button class="command-button" data-command="left">
+              <span class="command-icon">↶</span><span>Left</span>
+            </button>
+            <button class="command-button" data-command="right">
+              <span class="command-icon">↷</span><span>Right</span>
+            </button>
+            <button class="command-button" data-command="back">
+              <span class="command-icon">↓</span><span>Back</span>
+            </button>
+          </div>
+
+          <div class="coding-actions">
+            <button class="coding-secondary" id="coding-undo">Undo</button>
+            <button class="coding-secondary" id="coding-clear">Clear</button>
+            <button class="coding-run" id="coding-run">▶ Run</button>
+          </div>
+
+          <div class="coding-result hidden" id="coding-result">
+            <div class="coding-stars" id="coding-stars">★★★</div>
+            <strong id="coding-result-title">You made it!</strong>
+            <span id="coding-result-detail">Great program.</span>
+          </div>
+        </div>
+      </section>
+
     </main>
 
     <nav class="tab-bar" aria-label="Learning activities">
@@ -223,6 +286,9 @@
       </button>
       <button class="tab" data-screen="reading-screen">
         <span class="tab-icon reading-icon">Aa</span><span>Reading</span>
+      </button>
+      <button class="tab" data-screen="coding-screen">
+        <span class="tab-icon coding-icon">&lt;/&gt;</span><span>Coding</span>
       </button>
     </nav>
   </div>
