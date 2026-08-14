@@ -1549,8 +1549,8 @@ input[type="range"] {
 
 .laser-board {
   aspect-ratio: 8 / 10;
-  grid-template-columns: repeat(8, 1fr);
-  grid-template-rows: repeat(10, 1fr);
+  grid-template-columns: repeat(var(--laser-cols, 8), 1fr);
+  grid-template-rows: repeat(var(--laser-rows, 10), 1fr);
   gap: 2px;
   padding: 2px;
 }

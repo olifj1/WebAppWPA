@@ -1435,10 +1435,40 @@ const laserResult = $("#laser-result");
 const laserResultStars = $("#laser-result-stars");
 const laserResultText = $("#laser-result-text");
 
-const LASER_ROWS = 10;
-const LASER_COLS = 8;
+const laserLevelInfo = {
+  easy: {
+    rows: 10,
+    cols: 8,
+    mirrorsMin: 3,
+    mirrorsMax: 4,
+    checkpoints: 1,
+    minRouteCells: 17,
+    extraOpen: 18,
+    minEndpointDistance: 11
+  },
+  medium: {
+    rows: 12,
+    cols: 9,
+    mirrorsMin: 5,
+    mirrorsMax: 6,
+    checkpoints: 2,
+    minRouteCells: 27,
+    extraOpen: 12,
+    minEndpointDistance: 15
+  },
+  hard: {
+    rows: 14,
+    cols: 10,
+    mirrorsMin: 7,
+    mirrorsMax: 9,
+    checkpoints: 3,
+    minRouteCells: 39,
+    extraOpen: 6,
+    minEndpointDistance: 19
+  }
+};
 
-// Direction indices go clockwise in 45-degree steps.
+// Direction indices clockwise in 45-degree steps:
 // 0=N, 1=NE, 2=E, 3=SE, 4=S, 5=SW, 6=W, 7=NW.
 const laserDirVectors = [
   [-1, 0],
@@ -1451,37 +1481,37 @@ const laserDirVectors = [
   [-1, -1]
 ];
 
-const laserLevelInfo = {
-  easy:   { minMirrors: 3, maxMirrors: 4, checkpoints: 1, extraOpen: 20, minRoute: 14 },
-  medium: { minMirrors: 4, maxMirrors: 6, checkpoints: 2, extraOpen: 12, minRoute: 18 },
-  hard:   { minMirrors: 5, maxMirrors: 7, checkpoints: 2, extraOpen: 6, minRoute: 22 }
-};
-
 let laserLevel = localStorage.getItem("laserLevel") || "easy";
 let laserSelectedPiece = "mirror";
 let laserPuzzle = null;
-
-// Map cell -> orientation index 0..3.
-// Each orientation is a mirror line at 22.5 + 45*n degrees.
 let laserPlaced = new Map();
+
+function laserInfo() {
+  return laserLevelInfo[laserLevel];
+}
+
+function laserRows() {
+  return laserInfo().rows;
+}
+
+function laserCols() {
+  return laserInfo().cols;
+}
 
 function laserKey(row, col) {
   return `${row},${col}`;
 }
 
 function laserInBounds(row, col) {
-  return row >= 0 && row < LASER_ROWS && col >= 0 && col < LASER_COLS;
+  return row >= 0 && row < laserRows() && col >= 0 && col < laserCols();
 }
 
 function laserDirAngle(dir) {
   // Screen-space angle: 0° = right and 90° = down.
-  // Direction index 0 starts at north and turns clockwise.
   return (dir * 45 - 90 + 360) % 360;
 }
 
 function mirrorLineAngle(orientation) {
-  // 8 useful mirror line rotations: 0°, 22.5°, 45° ... 157.5°.
-  // This allows reflections to remain horizontal/vertical OR become diagonal.
   return orientation * 22.5;
 }
 
@@ -1492,7 +1522,6 @@ function normalizeAngle(angle) {
 }
 
 function angleToLaserDir(angle) {
-  // Convert screen-space angle back to our clockwise-from-north direction index.
   const normalized = normalizeAngle(angle);
   const dir = Math.round((normalized + 90) / 45);
   return ((dir % 8) + 8) % 8;
@@ -1501,12 +1530,10 @@ function angleToLaserDir(angle) {
 function laserReflect(dir, orientation) {
   const incoming = laserDirAngle(dir);
   const mirror = mirrorLineAngle(orientation);
-  const outgoing = 2 * mirror - incoming;
-  return angleToLaserDir(outgoing);
+  return angleToLaserDir(2 * mirror - incoming);
 }
 
 function mirrorOrientationForTurn(inDir, outDir) {
-  // Find one of the four mirror orientations that maps inDir to outDir.
   for (let orientation = 0; orientation < 8; orientation++) {
     if (laserReflect(inDir, orientation) === outDir) return orientation;
   }
@@ -1516,53 +1543,88 @@ function mirrorOrientationForTurn(inDir, outDir) {
 function laserDirectionBetween(a, b) {
   const dr = Math.sign(b.row - a.row);
   const dc = Math.sign(b.col - a.col);
-
   return laserDirVectors.findIndex(([r, c]) => r === dr && c === dc);
 }
 
-function randomLaserEmitter() {
-  const side = randomInt(0, 3);
-
-  if (side === 0) return { row: randomInt(1, LASER_ROWS - 2), col: 0, dir: 2 };
-  if (side === 1) return { row: randomInt(1, LASER_ROWS - 2), col: LASER_COLS - 1, dir: 6 };
-  if (side === 2) return { row: 0, col: randomInt(1, LASER_COLS - 2), dir: 4 };
-  return { row: LASER_ROWS - 1, col: randomInt(1, LASER_COLS - 2), dir: 0 };
+function endpointDistance(a, b) {
+  return Math.abs(a.row - b.row) + Math.abs(a.col - b.col);
 }
 
-function randomLaserTargetDifferentEdge(emitter) {
-  const edgeCandidates = [];
+function edgeCells() {
+  const cells = [];
+  const rows = laserRows();
+  const cols = laserCols();
 
-  for (let row = 0; row < LASER_ROWS; row++) {
-    for (let col = 0; col < LASER_COLS; col++) {
-      const isEdge = row === 0 || row === LASER_ROWS - 1 || col === 0 || col === LASER_COLS - 1;
-      if (!isEdge) continue;
-      if (row === emitter.row && col === emitter.col) continue;
-
-      // Keep some distance from emitter.
-      const d = Math.abs(row - emitter.row) + Math.abs(col - emitter.col);
-      if (d < 7) continue;
-
-      edgeCandidates.push({ row, col });
-    }
+  for (let col = 0; col < cols; col++) {
+    cells.push({ row: 0, col, inwardDir: 4 });
+    cells.push({ row: rows - 1, col, inwardDir: 0 });
   }
 
-  return edgeCandidates[randomInt(0, edgeCandidates.length - 1)];
+  for (let row = 1; row < rows - 1; row++) {
+    cells.push({ row, col: 0, inwardDir: 2 });
+    cells.push({ row, col: cols - 1, inwardDir: 6 });
+  }
+
+  return cells;
 }
 
-function shuffledDirections() {
-  return [0,1,2,3,4,5,6,7].sort(() => Math.random() - .5);
+function chooseDistantEndpoints() {
+  const info = laserInfo();
+  const edges = edgeCells();
+
+  for (let attempt = 0; attempt < 200; attempt++) {
+    const start = edges[randomInt(0, edges.length - 1)];
+    const distant = edges.filter(candidate =>
+      endpointDistance(start, candidate) >= info.minEndpointDistance &&
+      !(candidate.row === start.row && candidate.col === start.col)
+    );
+
+    if (!distant.length) continue;
+
+    const end = distant[randomInt(0, distant.length - 1)];
+    return {
+      emitter: { row: start.row, col: start.col, dir: start.inwardDir },
+      target: { row: end.row, col: end.col }
+    };
+  }
+
+  // Opposite corners as an absolute fallback.
+  return {
+    emitter: { row: laserRows() - 1, col: 0, dir: 0 },
+    target: { row: 0, col: laserCols() - 1 }
+  };
 }
 
-// Create a self-avoiding 8-direction route from emitter to target.
-function buildSegmentedLaserCandidate(level) {
-  const info = laserLevelInfo[level];
-  const desiredMirrors =
-    level === "easy" ? randomInt(3, 4) :
-    level === "medium" ? randomInt(4, 6) :
-    randomInt(5, 7);
+function directionHasRoom(row, col, dir, visited, minimum = 2) {
+  const [dr, dc] = laserDirVectors[dir];
 
-  for (let attempt = 0; attempt < 1200; attempt++) {
-    const emitter = randomLaserEmitter();
+  for (let step = 1; step <= minimum; step++) {
+    const nr = row + dr * step;
+    const nc = col + dc * step;
+    if (!laserInBounds(nr, nc)) return false;
+    if (visited.has(laserKey(nr, nc))) return false;
+  }
+
+  return true;
+}
+
+function segmentLengthsForLevel() {
+  if (laserLevel === "easy") return [3, 4, 5, 2];
+  if (laserLevel === "medium") return [4, 5, 3, 6, 2];
+  return [5, 6, 4, 7, 3, 2];
+}
+
+// Build a long segmented route. Each bend is known in advance, so the puzzle
+// is guaranteed to have a reflector solution and we can place checkpoints
+// only on straight sections.
+function buildSegmentedLaserCandidate() {
+  const info = laserInfo();
+  const desiredMirrors = randomInt(info.mirrorsMin, info.mirrorsMax);
+
+  for (let attempt = 0; attempt < 1600; attempt++) {
+    const endpoints = chooseDistantEndpoints();
+    const emitter = endpoints.emitter;
+
     let row = emitter.row;
     let col = emitter.col;
     let dir = emitter.dir;
@@ -1570,23 +1632,19 @@ function buildSegmentedLaserCandidate(level) {
     const route = [{ row, col }];
     const visited = new Set([laserKey(row, col)]);
     const mirrorCells = [];
+    const segmentRanges = [];
     let failed = false;
 
     for (let mirrorIndex = 0; mirrorIndex < desiredMirrors; mirrorIndex++) {
-      const [dr, dc] = laserDirVectors[dir];
+      const lengths = [...segmentLengthsForLevel()].sort(() => Math.random() - .5);
+      let segment = null;
 
-      // Travel a short straight section before each mirror.
-      const possibleLengths =
-        level === "easy"
-          ? [2, 3, 4].sort(() => Math.random() - .5)
-          : [2, 3, 4, 5].sort(() => Math.random() - .5);
-      let corner = null;
-
-      for (const length of possibleLengths) {
+      for (const length of lengths) {
+        const [dr, dc] = laserDirVectors[dir];
+        const cells = [];
         let tr = row;
         let tc = col;
         let valid = true;
-        const segment = [];
 
         for (let step = 0; step < length; step++) {
           tr += dr;
@@ -1597,10 +1655,10 @@ function buildSegmentedLaserCandidate(level) {
             break;
           }
 
-          // Mirrors should stay away from the outer edge.
+          // Do not put a mirror on an outer edge.
           if (
             step === length - 1 &&
-            (tr === 0 || tr === LASER_ROWS - 1 || tc === 0 || tc === LASER_COLS - 1)
+            (tr === 0 || tr === laserRows() - 1 || tc === 0 || tc === laserCols() - 1)
           ) {
             valid = false;
             break;
@@ -1612,59 +1670,51 @@ function buildSegmentedLaserCandidate(level) {
             break;
           }
 
-          segment.push({ row: tr, col: tc });
+          cells.push({ row: tr, col: tc });
         }
 
         if (valid) {
-          corner = { row: tr, col: tc, segment };
+          segment = cells;
           break;
         }
       }
 
-      if (!corner) {
+      if (!segment) {
         failed = true;
         break;
       }
 
-      for (const cell of corner.segment) {
+      const segmentStartIndex = route.length;
+
+      for (const cell of segment) {
         visited.add(laserKey(cell.row, cell.col));
         route.push({ ...cell });
       }
 
-      row = corner.row;
-      col = corner.col;
+      row = segment[segment.length - 1].row;
+      col = segment[segment.length - 1].col;
 
-      // Pick a new direction that a mirror can create and that has room ahead.
-      const directionChoices = [0,1,2,3,4,5,6,7]
+      const possibleDirs = [0,1,2,3,4,5,6,7]
         .filter(nextDir => {
-          if (nextDir === dir || nextDir === (dir + 4) % 8) return false;
-
-          const orientation = mirrorOrientationForTurn(dir, nextDir);
-          if (orientation === null) return false;
-
-          const [ndr, ndc] = laserDirVectors[nextDir];
-          const nr = row + ndr;
-          const nc = col + ndc;
-
-          if (!laserInBounds(nr, nc)) return false;
-          if (visited.has(laserKey(nr, nc))) return false;
-
-          return true;
+          if (nextDir === dir) return false;
+          if (nextDir === (dir + 4) % 8) return false;
+          if (mirrorOrientationForTurn(dir, nextDir) === null) return false;
+          return directionHasRoom(row, col, nextDir, visited, 2);
         })
         .sort(() => Math.random() - .5);
 
-      if (!directionChoices.length) {
+      if (!possibleDirs.length) {
         failed = true;
         break;
       }
 
-      const nextDir = directionChoices[0];
+      const nextDir = possibleDirs[0];
       const orientation = mirrorOrientationForTurn(dir, nextDir);
 
-      mirrorCells.push({
-        row,
-        col,
-        orientation
+      mirrorCells.push({ row, col, orientation });
+      segmentRanges.push({
+        start: segmentStartIndex,
+        end: route.length - 1
       });
 
       dir = nextDir;
@@ -1672,11 +1722,12 @@ function buildSegmentedLaserCandidate(level) {
 
     if (failed) continue;
 
-    // After the final mirror, extend the beam until it reaches an outer edge.
+    // Extend the final leg to whichever edge it meets.
     const [fdr, fdc] = laserDirVectors[dir];
+    const finalStartIndex = route.length;
     let target = null;
 
-    for (let step = 0; step < 20; step++) {
+    for (let step = 0; step < Math.max(laserRows(), laserCols()) + 4; step++) {
       row += fdr;
       col += fdc;
 
@@ -1691,49 +1742,83 @@ function buildSegmentedLaserCandidate(level) {
       visited.add(key);
       route.push({ row, col });
 
-      if (row === 0 || row === LASER_ROWS - 1 || col === 0 || col === LASER_COLS - 1) {
+      const isEdge =
+        row === 0 || row === laserRows() - 1 ||
+        col === 0 || col === laserCols() - 1;
+
+      if (isEdge) {
         target = { row, col };
         break;
       }
     }
 
     if (failed || !target) continue;
-    if (route.length < info.minRoute) continue;
+    if (endpointDistance(emitter, target) < info.minEndpointDistance) continue;
+    if (route.length < info.minRouteCells) continue;
 
-    const routeKeys = new Set(route.map(cell => laserKey(cell.row, cell.col)));
-    const mirrorKeys = new Set(mirrorCells.map(m => laserKey(m.row, m.col)));
-
-    const checkpointCandidates = route.filter((cell, index) => {
-      if (index <= 2 || index >= route.length - 2) return false;
-
-      const key = laserKey(cell.row, cell.col);
-      if (mirrorKeys.has(key)) return false;
-
-      const prev = route[index - 1];
-      const next = route[index + 1];
-      const inDir = laserDirectionBetween(prev, cell);
-      const outDir = laserDirectionBetween(cell, next);
-
-      // A checkpoint is only placed on a straight section of the intended path.
-      return inDir === outDir;
+    segmentRanges.push({
+      start: finalStartIndex,
+      end: route.length - 1
     });
 
-    if (checkpointCandidates.length < info.checkpoints) continue;
+    const routeKeys = new Set(route.map(cell => laserKey(cell.row, cell.col)));
+    const mirrorKeys = new Set(mirrorCells.map(cell => laserKey(cell.row, cell.col)));
 
-    const checkpoints = [...checkpointCandidates]
-      .sort(() => Math.random() - .5)
-      .slice(0, info.checkpoints);
+    // Build checkpoint candidates from the interior of long straight segments.
+    // Spread them through the journey rather than letting them bunch together.
+    const checkpointPools = segmentRanges
+      .map(range => {
+        const cells = [];
+        for (let i = range.start + 1; i <= range.end - 1; i++) {
+          if (i <= 2 || i >= route.length - 2) continue;
+          const cell = route[i];
+          if (mirrorKeys.has(laserKey(cell.row, cell.col))) continue;
+          cells.push({ ...cell, routeIndex: i });
+        }
+        return cells;
+      })
+      .filter(pool => pool.length);
+
+    if (checkpointPools.length < info.checkpoints) continue;
+
+    const checkpoints = [];
+    const usedSegments = new Set();
+
+    // Aim for evenly spaced checkpoints along the whole route.
+    for (let checkpointIndex = 0; checkpointIndex < info.checkpoints; checkpointIndex++) {
+      const targetFraction = (checkpointIndex + 1) / (info.checkpoints + 1);
+      const targetRouteIndex = targetFraction * route.length;
+
+      let best = null;
+
+      checkpointPools.forEach((pool, poolIndex) => {
+        if (usedSegments.has(poolIndex) && checkpointPools.length >= info.checkpoints) return;
+
+        pool.forEach(cell => {
+          const distance = Math.abs(cell.routeIndex - targetRouteIndex);
+          if (!best || distance < best.distance) {
+            best = { cell, poolIndex, distance };
+          }
+        });
+      });
+
+      if (!best) break;
+      checkpoints.push({ row: best.cell.row, col: best.cell.col });
+      usedSegments.add(best.poolIndex);
+    }
+
+    if (checkpoints.length !== info.checkpoints) continue;
 
     const obstacles = new Set();
 
-    for (let r = 0; r < LASER_ROWS; r++) {
-      for (let c = 0; c < LASER_COLS; c++) {
+    for (let r = 0; r < laserRows(); r++) {
+      for (let c = 0; c < laserCols(); c++) {
         const key = laserKey(r, c);
         if (!routeKeys.has(key)) obstacles.add(key);
       }
     }
 
-    // Open some extra cells so the intended route isn't just an obvious tunnel.
+    // Open a controlled number of cells. Hard remains much more maze-like.
     const obstacleList = [...obstacles].sort(() => Math.random() - .5);
     let opened = 0;
 
@@ -1741,10 +1826,14 @@ function buildSegmentedLaserCandidate(level) {
       if (opened >= info.extraOpen) break;
 
       const [r, c] = key.split(",").map(Number);
-      if (r === 0 || r === LASER_ROWS - 1 || c === 0 || c === LASER_COLS - 1) continue;
+      const onEdge =
+        r === 0 || r === laserRows() - 1 ||
+        c === 0 || c === laserCols() - 1;
+
+      if (onEdge) continue;
 
       obstacles.delete(key);
-      opened += 1;
+      opened++;
     }
 
     return {
@@ -1753,89 +1842,132 @@ function buildSegmentedLaserCandidate(level) {
       checkpoints,
       obstacles,
       solutionMirrors: mirrorCells,
-      mirrorLimit: mirrorCells.length
+      mirrorLimit: mirrorCells.length,
+      route
     };
   }
 
   return null;
 }
 
-function buildLaserPuzzle() {
-  const info = laserLevelInfo[laserLevel];
-  laserPlaced = new Map();
-  laserResult.classList.add("hidden");
+function buildGuaranteedLaserPuzzle() {
+  const info = laserInfo();
+  const rows = info.rows;
+  const cols = info.cols;
 
-  let built = buildSegmentedLaserCandidate(laserLevel);
+  // A deterministic zig-zag corridor scaled to each board.
+  const emitter = { row: rows - 1, col: 0, dir: 0 };
+  const target = { row: 0, col: cols - 1 };
 
-  if (!built) {
-    // Level-specific guaranteed layouts, used only if random generation fails.
-    if (laserLevel === "easy") {
-      const emitter = { row: 9, col: 1, dir: 0 };
-      const target = { row: 0, col: 5 };
-      const checkpoints = [{ row: 5, col: 3 }];
-      const solutionMirrors = [
-        { row: 7, col: 1, orientation: mirrorOrientationForTurn(0, 1) },
-        { row: 5, col: 3, orientation: mirrorOrientationForTurn(1, 0) },
-        { row: 3, col: 3, orientation: mirrorOrientationForTurn(0, 1) }
-      ];
-      built = {
-        emitter,
-        target,
-        checkpoints,
-        obstacles: new Set(["8,4","7,5","6,5","5,5","4,1","3,1","2,1"]),
-        solutionMirrors,
-        mirrorLimit: 3
-      };
-    } else if (laserLevel === "medium") {
-      const emitter = { row: 9, col: 0, dir: 2 };
-      const target = { row: 0, col: 7 };
-      const checkpoints = [{ row: 7, col: 3 }, { row: 3, col: 5 }];
-      const solutionMirrors = [
-        { row: 9, col: 2, orientation: mirrorOrientationForTurn(2, 1) },
-        { row: 7, col: 4, orientation: mirrorOrientationForTurn(1, 0) },
-        { row: 4, col: 4, orientation: mirrorOrientationForTurn(0, 1) },
-        { row: 2, col: 6, orientation: mirrorOrientationForTurn(1, 0) },
-        { row: 0, col: 6, orientation: mirrorOrientationForTurn(0, 2) }
-      ];
-      built = {
-        emitter,
-        target,
-        checkpoints,
-        obstacles: new Set([
-          "8,1","8,2","8,6","7,6","6,0","6,1","6,5","5,1","5,5",
-          "4,0","4,1","4,6","3,1","3,2","3,6","2,1","1,2","1,5"
-        ]),
-        solutionMirrors,
-        mirrorLimit: 5
-      };
-    } else {
-      const emitter = { row: 9, col: 1, dir: 0 };
-      const target = { row: 0, col: 6 };
-      const checkpoints = [{ row: 7, col: 3 }, { row: 3, col: 4 }];
-      const solutionMirrors = [
-        { row: 7, col: 1, orientation: mirrorOrientationForTurn(0, 1) },
-        { row: 5, col: 3, orientation: mirrorOrientationForTurn(1, 2) },
-        { row: 5, col: 6, orientation: mirrorOrientationForTurn(2, 7) },
-        { row: 3, col: 4, orientation: mirrorOrientationForTurn(7, 0) },
-        { row: 1, col: 4, orientation: mirrorOrientationForTurn(0, 1) },
-        { row: 0, col: 5, orientation: mirrorOrientationForTurn(1, 2) }
-      ];
-      built = {
-        emitter,
-        target,
-        checkpoints,
-        obstacles: new Set([
-          "8,0","8,4","8,5","7,5","6,0","6,4","6,5","5,0","5,1",
-          "4,0","4,2","4,3","4,6","4,7","3,0","3,1","3,6","2,1",
-          "2,2","2,6","1,1","1,2","1,6"
-        ]),
-        solutionMirrors,
-        mirrorLimit: 6
-      };
+  const waypoints =
+    laserLevel === "easy"
+      ? [
+          { row: rows - 4, col: 0 },
+          { row: rows - 6, col: 2 },
+          { row: 2, col: 2 },
+          { row: 0, col: cols - 1 }
+        ]
+      : laserLevel === "medium"
+      ? [
+          { row: rows - 4, col: 0 },
+          { row: rows - 6, col: 2 },
+          { row: rows - 6, col: cols - 3 },
+          { row: rows - 9, col: cols - 3 },
+          { row: 2, col: 3 },
+          { row: 0, col: cols - 1 }
+        ]
+      : [
+          { row: rows - 4, col: 0 },
+          { row: rows - 6, col: 2 },
+          { row: rows - 6, col: cols - 3 },
+          { row: rows - 9, col: cols - 3 },
+          { row: rows - 9, col: 3 },
+          { row: 4, col: 3 },
+          { row: 2, col: cols - 3 },
+          { row: 0, col: cols - 1 }
+        ];
+
+  const route = [{ row: emitter.row, col: emitter.col }];
+  const mirrorCells = [];
+  let current = { row: emitter.row, col: emitter.col };
+  let inDir = emitter.dir;
+
+  for (const waypoint of waypoints) {
+    const dr = Math.sign(waypoint.row - current.row);
+    const dc = Math.sign(waypoint.col - current.col);
+    const outDir = laserDirVectors.findIndex(([r, c]) => r === dr && c === dc);
+
+    if (outDir !== inDir && route.length > 1) {
+      const corner = route[route.length - 1];
+      mirrorCells.push({
+        row: corner.row,
+        col: corner.col,
+        orientation: mirrorOrientationForTurn(inDir, outDir)
+      });
+    }
+
+    while (current.row !== waypoint.row || current.col !== waypoint.col) {
+      current = { row: current.row + dr, col: current.col + dc };
+      route.push({ ...current });
+    }
+
+    inDir = outDir;
+  }
+
+  const routeKeys = new Set(route.map(cell => laserKey(cell.row, cell.col)));
+  const mirrorKeys = new Set(mirrorCells.map(cell => laserKey(cell.row, cell.col)));
+
+  const candidates = route
+    .map((cell, index) => ({ ...cell, index }))
+    .filter(item =>
+      item.index > 2 &&
+      item.index < route.length - 2 &&
+      !mirrorKeys.has(laserKey(item.row, item.col))
+    );
+
+  const checkpoints = [];
+  for (let i = 0; i < info.checkpoints; i++) {
+    const wanted = Math.round((i + 1) * candidates.length / (info.checkpoints + 1));
+    const candidate = candidates[Math.min(candidates.length - 1, wanted)];
+    if (candidate) checkpoints.push({ row: candidate.row, col: candidate.col });
+  }
+
+  const obstacles = new Set();
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const key = laserKey(r, c);
+      if (!routeKeys.has(key)) obstacles.add(key);
     }
   }
 
-  laserPuzzle = built;
+  // Make a few openings so the answer isn't visually given away.
+  const extras = [...obstacles];
+  for (let i = 0; i < Math.min(info.extraOpen, extras.length); i += 2) {
+    obstacles.delete(extras[i]);
+  }
+
+  return {
+    emitter,
+    target,
+    checkpoints,
+    obstacles,
+    solutionMirrors: mirrorCells,
+    mirrorLimit: mirrorCells.length,
+    route
+  };
+}
+
+function buildLaserPuzzle() {
+  laserPlaced = new Map();
+  laserResult.classList.add("hidden");
+
+  laserPuzzle = buildSegmentedLaserCandidate() || buildGuaranteedLaserPuzzle();
+
+  const info = laserInfo();
+  laserBoard.style.setProperty("--laser-cols", info.cols);
+  laserBoard.style.setProperty("--laser-rows", info.rows);
+  laserBoard.style.aspectRatio = `${info.cols} / ${info.rows}`;
+
   renderLaserBoard();
   traceLaser();
 }
@@ -1851,8 +1983,8 @@ function emitterClassFromDir(dir) {
 function renderLaserBoard() {
   laserBoard.innerHTML = "";
 
-  for (let row = 0; row < LASER_ROWS; row++) {
-    for (let col = 0; col < LASER_COLS; col++) {
+  for (let row = 0; row < laserRows(); row++) {
+    for (let col = 0; col < laserCols(); col++) {
       const key = laserKey(row, col);
       const cell = document.createElement("button");
       cell.type = "button";
@@ -1865,9 +1997,17 @@ function renderLaserBoard() {
         cell.disabled = true;
       }
 
-      const isEmitter = row === laserPuzzle.emitter.row && col === laserPuzzle.emitter.col;
-      const isTarget = row === laserPuzzle.target.row && col === laserPuzzle.target.col;
-      const checkpoint = laserPuzzle.checkpoints.find(cp => cp.row === row && cp.col === col);
+      const isEmitter =
+        row === laserPuzzle.emitter.row &&
+        col === laserPuzzle.emitter.col;
+
+      const isTarget =
+        row === laserPuzzle.target.row &&
+        col === laserPuzzle.target.col;
+
+      const checkpoint = laserPuzzle.checkpoints.find(
+        cp => cp.row === row && cp.col === col
+      );
 
       if (isEmitter) {
         cell.classList.add("emitter-cell");
@@ -1941,8 +2081,7 @@ function placeLaserPiece(row, col) {
         return;
       }
 
-      // Start new mirrors at 45°, which turns a straight horizontal/vertical beam
-      // through 90° and keeps it on the grid. Repeated taps then cycle through all 8 angles.
+      // Start at 45° because it gives the familiar right-angle reflection.
       laserPlaced.set(key, 2);
     }
   }
@@ -1953,14 +2092,21 @@ function placeLaserPiece(row, col) {
 }
 
 function laserCellCenter(row, col) {
-  const x = (col + 0.5) * (800 / LASER_COLS);
-  const y = (row + 0.5) * (1000 / LASER_ROWS);
-  return [x, y];
+  const width = laserCols() * 100;
+  const height = laserRows() * 100;
+  return [
+    (col + 0.5) * (width / laserCols()),
+    (row + 0.5) * (height / laserRows())
+  ];
 }
 
 function traceLaser() {
   laserBeamLayer.innerHTML = "";
-  laserBeamLayer.setAttribute("viewBox", "0 0 800 1000");
+
+  const width = laserCols() * 100;
+  const height = laserRows() * 100;
+  laserBeamLayer.setAttribute("viewBox", `0 0 ${width} ${height}`);
+
   laserStatus.classList.remove("good", "bad");
 
   const points = [];
@@ -1973,7 +2119,7 @@ function traceLaser() {
 
   points.push(laserCellCenter(row, col));
 
-  for (let steps = 0; steps < 160; steps++) {
+  for (let steps = 0; steps < 300; steps++) {
     const stateKey = `${row},${col},${dir}`;
     if (seenStates.has(stateKey)) break;
     seenStates.add(stateKey);
@@ -1983,15 +2129,15 @@ function traceLaser() {
     const nc = col + dc;
 
     if (!laserInBounds(nr, nc)) {
-      const x = (col + 0.5 + dc * 0.5) * (800 / LASER_COLS);
-      const y = (row + 0.5 + dr * 0.5) * (1000 / LASER_ROWS);
+      const x = (col + 0.5 + dc * 0.5) * 100;
+      const y = (row + 0.5 + dr * 0.5) * 100;
       points.push([x, y]);
       break;
     }
 
     if (laserPuzzle.obstacles.has(laserKey(nr, nc))) {
-      const x = (col + 0.5 + dc * 0.5) * (800 / LASER_COLS);
-      const y = (row + 0.5 + dr * 0.5) * (1000 / LASER_ROWS);
+      const x = (col + 0.5 + dc * 0.5) * 100;
+      const y = (row + 0.5 + dr * 0.5) * 100;
       points.push([x, y]);
       break;
     }
@@ -2026,15 +2172,14 @@ function traceLaser() {
   });
 
   const targetIndicator = $("#laser-target-indicator");
-  if (targetIndicator) {
-    targetIndicator.classList.toggle("hit", hitTarget);
-  }
+  if (targetIndicator) targetIndicator.classList.toggle("hit", hitTarget);
 
   const mirrorsUsed = laserPlaced.size;
   laserMirrorCount.textContent = `${mirrorsUsed} / ${laserPuzzle.mirrorLimit}`;
   laserCheckpointCount.textContent = `${hitCheckpoints.size} / ${laserPuzzle.checkpoints.length}`;
 
-  const allCheckpointsHit = hitCheckpoints.size === laserPuzzle.checkpoints.length;
+  const allCheckpointsHit =
+    hitCheckpoints.size === laserPuzzle.checkpoints.length;
 
   if (hitTarget && allCheckpointsHit) {
     laserStatus.classList.add("good");
@@ -2044,7 +2189,9 @@ function traceLaser() {
     const extra = mirrorsUsed - optimal;
     const stars = extra <= 0 ? 3 : extra === 1 ? 2 : 1;
 
-    laserResultStars.textContent = "★".repeat(stars) + "☆".repeat(3 - stars);
+    laserResultStars.textContent =
+      "★".repeat(stars) + "☆".repeat(3 - stars);
+
     laserResultText.textContent =
       mirrorsUsed === optimal
         ? `Perfect solution — ${mirrorsUsed} mirrors.`
@@ -2064,7 +2211,9 @@ function traceLaser() {
 laserPieceButtons.forEach(button => {
   button.addEventListener("click", () => {
     laserSelectedPiece = button.dataset.laserPiece;
-    laserPieceButtons.forEach(b => b.classList.toggle("active", b === button));
+    laserPieceButtons.forEach(b =>
+      b.classList.toggle("active", b === button)
+    );
   });
 });
 
