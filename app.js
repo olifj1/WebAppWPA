@@ -1062,6 +1062,7 @@ function buildCodingPuzzle() {
   codingStatus.classList.remove("good", "bad", "resetting");
   codingStatus.textContent = `Can you reach the flag? Best route: ${puzzle.solution.length} commands.`;
 
+  renderCodingBoard();
   renderCodingProgram();
   setCodingControlsEnabled(true);
 }
