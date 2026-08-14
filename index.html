@@ -227,8 +227,21 @@
             <button class="new-puzzle-button" id="new-coding-puzzle">New</button>
           </div>
 
+          <label class="guide-toggle" for="coding-guide-toggle">
+            <span>
+              <strong>Learning guide</strong>
+              <small>Show what each command will do on the grid</small>
+            </span>
+            <input id="coding-guide-toggle" type="checkbox" checked>
+          </label>
+
           <div class="coding-board-wrap">
             <div class="coding-board" id="coding-board" aria-label="Coding puzzle grid"></div>
+            <div class="coding-win-overlay hidden" id="coding-win-overlay" aria-live="polite">
+              <div class="coding-win-stars" id="coding-win-stars">★★★</div>
+              <strong>Flag reached!</strong>
+              <span id="coding-win-text">Great program!</span>
+            </div>
           </div>
 
           <div class="coding-status" id="coding-status">Build your program, then press Run.</div>
@@ -262,12 +275,6 @@
             <button class="coding-secondary" id="coding-undo">Undo</button>
             <button class="coding-secondary" id="coding-clear">Clear</button>
             <button class="coding-run" id="coding-run">▶ Run</button>
-          </div>
-
-          <div class="coding-result hidden" id="coding-result">
-            <div class="coding-stars" id="coding-stars">★★★</div>
-            <strong id="coding-result-title">You made it!</strong>
-            <span id="coding-result-detail">Great program.</span>
           </div>
         </div>
       </section>

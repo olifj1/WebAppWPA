@@ -780,24 +780,40 @@ const codingRun = $("#coding-run");
 const codingClear = $("#coding-clear");
 const codingUndo = $("#coding-undo");
 const newCodingPuzzle = $("#new-coding-puzzle");
-const codingResult = $("#coding-result");
-const codingStars = $("#coding-stars");
-const codingResultTitle = $("#coding-result-title");
-const codingResultDetail = $("#coding-result-detail");
+const codingGuideToggle = $("#coding-guide-toggle");
+const codingWinOverlay = $("#coding-win-overlay");
+const codingWinStars = $("#coding-win-stars");
+const codingWinText = $("#coding-win-text");
 
 const CODING_ROWS = 7;
 const CODING_COLS = 6;
+
 const codingLevelInfo = {
-  easy:   { obstacles: 6,  minOptimal: 5 },
-  medium: { obstacles: 9,  minOptimal: 7 },
-  hard:   { obstacles: 12, minOptimal: 9 }
+  easy: {
+    minCommands: 7,
+    minTurns: 2,
+    extraOpenCells: 13,
+    maxCommands: 18
+  },
+  medium: {
+    minCommands: 10,
+    minTurns: 3,
+    extraOpenCells: 7,
+    maxCommands: 22
+  },
+  hard: {
+    minCommands: 13,
+    minTurns: 4,
+    extraOpenCells: 2,
+    maxCommands: 28
+  }
 };
 
 const directionVectors = [
-  [-1, 0],
-  [0, 1],
-  [1, 0],
-  [0, -1]
+  [-1, 0], // north
+  [0, 1],  // east
+  [1, 0],  // south
+  [0, -1]  // west
 ];
 
 const commandGlyphs = {
@@ -807,11 +823,21 @@ const commandGlyphs = {
   right: "↷"
 };
 
+const absoluteMoveGlyph = {
+  "0,-1": "←",
+  "0,1": "→",
+  "-1,0": "↑",
+  "1,0": "↓"
+};
+
 let codingLevel = localStorage.getItem("codingLevel") || "easy";
+let codingGuideOn = localStorage.getItem("codingGuideOn") !== "false";
 let codingPuzzle = null;
 let codingProgram = [];
 let codingRunning = false;
 let codingRunToken = 0;
+
+codingGuideToggle.checked = codingGuideOn;
 
 function cellKey(row, col) {
   return `${row},${col}`;
@@ -829,13 +855,11 @@ function nextCodingState(state, command, puzzle = codingPuzzle) {
   let { row, col, dir } = state;
 
   if (command === "left") {
-    dir = (dir + 3) % 4;
-    return { row, col, dir, collision: false };
+    return { row, col, dir: (dir + 3) % 4, collision: false };
   }
 
   if (command === "right") {
-    dir = (dir + 1) % 4;
-    return { row, col, dir, collision: false };
+    return { row, col, dir: (dir + 1) % 4, collision: false };
   }
 
   const [dr, dc] = directionVectors[dir];
@@ -879,60 +903,240 @@ function codingShortestProgram(puzzle) {
   return null;
 }
 
+function countProgramTurns(program) {
+  return program.filter(command => command === "left" || command === "right").length;
+}
+
+// Make one long, self-avoiding route first, then turn most other cells into blocks.
+// This produces much more maze-like layouts than simply scattering random blocks.
+function makeWindingRoute(start, goal, minimumCells) {
+  const path = [{ ...start }];
+  const visited = new Set([cellKey(start.row, start.col)]);
+
+  function dfs(row, col) {
+    if (
+      row === goal.row &&
+      col === goal.col &&
+      path.length >= minimumCells
+    ) {
+      return true;
+    }
+
+    const candidates = [
+      [-1, 0], [0, 1], [0, -1], [1, 0]
+    ].map(([dr, dc]) => ({ row: row + dr, col: col + dc }))
+     .filter(cell =>
+       codingInBounds(cell.row, cell.col) &&
+       !visited.has(cellKey(cell.row, cell.col)) &&
+       // Do not touch the top row until we enter the goal.
+       (cell.row !== 0 || (cell.row === goal.row && cell.col === goal.col))
+     );
+
+    // Prefer sideways moves often enough to create bends.
+    candidates.sort(() => Math.random() - .5);
+    candidates.sort((a, b) => {
+      const aSide = a.row === row ? -0.25 : 0;
+      const bSide = b.row === row ? -0.25 : 0;
+      return (Math.random() + aSide) - (Math.random() + bSide);
+    });
+
+    for (const next of candidates) {
+      visited.add(cellKey(next.row, next.col));
+      path.push(next);
+
+      if (dfs(next.row, next.col)) return true;
+
+      path.pop();
+      visited.delete(cellKey(next.row, next.col));
+    }
+
+    return false;
+  }
+
+  return dfs(start.row, start.col) ? path : null;
+}
+
+function buildMazeCandidate(level) {
+  const info = codingLevelInfo[level];
+
+  const start = {
+    row: CODING_ROWS - 1,
+    col: randomInt(0, CODING_COLS - 1)
+  };
+
+  let goalCol = randomInt(0, CODING_COLS - 1);
+  if (CODING_COLS > 2) {
+    while (Math.abs(goalCol - start.col) < 2) {
+      goalCol = randomInt(0, CODING_COLS - 1);
+    }
+  }
+
+  const goal = { row: 0, col: goalCol };
+
+  const routeMinimum =
+    level === "easy" ? 9 :
+    level === "medium" ? 12 : 15;
+
+  const route = makeWindingRoute(start, goal, routeMinimum);
+  if (!route) return null;
+
+  const routeSet = new Set(route.map(cell => cellKey(cell.row, cell.col)));
+  const obstacles = new Set();
+
+  for (let row = 0; row < CODING_ROWS; row++) {
+    for (let col = 0; col < CODING_COLS; col++) {
+      const key = cellKey(row, col);
+      if (!routeSet.has(key)) obstacles.add(key);
+    }
+  }
+
+  // Open a few extra spaces. Easy has more freedom; Hard is closer to a corridor maze.
+  const obstacleArray = [...obstacles].sort(() => Math.random() - .5);
+  let opened = 0;
+
+  for (const key of obstacleArray) {
+    if (opened >= info.extraOpenCells) break;
+
+    const [row, col] = key.split(",").map(Number);
+    if (row === 0 || row === CODING_ROWS - 1) continue;
+
+    obstacles.delete(key);
+    opened += 1;
+  }
+
+  const puzzle = { start, goal, obstacles };
+  const solution = codingShortestProgram(puzzle);
+  if (!solution) return null;
+
+  const turns = countProgramTurns(solution);
+
+  if (
+    solution.length < info.minCommands ||
+    solution.length > info.maxCommands ||
+    turns < info.minTurns
+  ) {
+    return null;
+  }
+
+  puzzle.solution = solution;
+  return puzzle;
+}
+
 function buildCodingPuzzle() {
   codingRunToken += 1;
   codingRunning = false;
   codingProgram = [];
-  codingResult.classList.add("hidden");
+  codingWinOverlay.classList.add("hidden");
 
-  const info = codingLevelInfo[codingLevel];
   let puzzle = null;
 
-  for (let attempt = 0; attempt < 250; attempt++) {
-    const start = { row: CODING_ROWS - 1, col: randomInt(0, CODING_COLS - 1) };
-    const goal = { row: 0, col: randomInt(0, CODING_COLS - 1) };
-    const obstacles = new Set();
-
-    while (obstacles.size < info.obstacles) {
-      const row = randomInt(1, CODING_ROWS - 2);
-      const col = randomInt(0, CODING_COLS - 1);
-      obstacles.add(cellKey(row, col));
-    }
-
-    const candidate = { start, goal, obstacles };
-    const solution = codingShortestProgram(candidate);
-
-    if (solution && solution.length >= info.minOptimal && solution.length <= 24) {
-      candidate.solution = solution;
-      puzzle = candidate;
-      break;
-    }
+  for (let attempt = 0; attempt < 500; attempt++) {
+    puzzle = buildMazeCandidate(codingLevel);
+    if (puzzle) break;
   }
 
+  // Guaranteed fallback.
   if (!puzzle) {
-    const start = { row: 6, col: 2 };
+    const start = { row: 6, col: 1 };
     const goal = { row: 0, col: 4 };
-    const obstacles = new Set(["4,2", "4,3", "2,3", "2,4", "1,1"]);
+    const open = new Set([
+      "6,1","5,1","4,1","4,2","4,3","3,3","2,3","2,4","1,4","0,4",
+      "5,0","3,2","1,3"
+    ]);
+    const obstacles = new Set();
+
+    for (let row = 0; row < CODING_ROWS; row++) {
+      for (let col = 0; col < CODING_COLS; col++) {
+        const key = cellKey(row, col);
+        if (!open.has(key)) obstacles.add(key);
+      }
+    }
+
     puzzle = { start, goal, obstacles };
     puzzle.solution = codingShortestProgram(puzzle);
   }
 
   codingPuzzle = puzzle;
-  codingPuzzle.state = {
-    row: puzzle.start.row,
-    col: puzzle.start.col,
-    dir: 0
-  };
+  resetCodingRover(false);
 
-  codingStatus.classList.remove("good", "bad");
+  codingStatus.classList.remove("good", "bad", "resetting");
   codingStatus.textContent = `Can you reach the flag? Best route: ${puzzle.solution.length} commands.`;
-  renderCodingBoard();
+
   renderCodingProgram();
   setCodingControlsEnabled(true);
 }
 
+function addGuideMarker(cell, glyph, stepNumber, kind = "") {
+  const marker = document.createElement("span");
+  marker.className = `guide-marker ${kind}`.trim();
+  marker.textContent = glyph;
+
+  const number = document.createElement("span");
+  number.className = "guide-step-number";
+  number.textContent = stepNumber;
+  marker.appendChild(number);
+
+  cell.appendChild(marker);
+}
+
+function simulateCodingGuide() {
+  const preview = [];
+  let state = {
+    row: codingPuzzle.start.row,
+    col: codingPuzzle.start.col,
+    dir: 0
+  };
+
+  codingProgram.forEach((command, index) => {
+    if (preview.some(item => item.collision)) return;
+
+    const before = { ...state };
+    const next = nextCodingState(state, command);
+
+    if (command === "left" || command === "right") {
+      preview.push({
+        row: before.row,
+        col: before.col,
+        glyph: command === "left" ? "↶" : "↷",
+        step: index + 1,
+        kind: "guide-turn",
+        collision: false
+      });
+    } else if (next.collision) {
+      const [dr, dc] = directionVectors[before.dir];
+      const sign = command === "back" ? -1 : 1;
+      preview.push({
+        row: before.row,
+        col: before.col,
+        glyph: "×",
+        step: index + 1,
+        kind: "guide-collision",
+        collision: true
+      });
+    } else {
+      const dr = next.row - before.row;
+      const dc = next.col - before.col;
+      preview.push({
+        row: next.row,
+        col: next.col,
+        glyph: absoluteMoveGlyph[`${dr},${dc}`] || "•",
+        step: index + 1,
+        kind: "",
+        collision: false
+      });
+    }
+
+    if (!next.collision) {
+      state = { row: next.row, col: next.col, dir: next.dir };
+    }
+  });
+
+  return preview;
+}
+
 function renderCodingBoard() {
   codingBoard.innerHTML = "";
+  const guide = codingGuideOn && !codingRunning ? simulateCodingGuide() : [];
 
   for (let row = 0; row < CODING_ROWS; row++) {
     for (let col = 0; col < CODING_COLS; col++) {
@@ -961,6 +1165,19 @@ function renderCodingBoard() {
         flag.textContent = "🏁";
         cell.appendChild(flag);
       }
+
+      guide
+        .filter(item => item.row === row && item.col === col)
+        .forEach((item, markerIndex) => {
+          const wrapper = document.createElement("span");
+          wrapper.style.position = "absolute";
+          wrapper.style.inset = "0";
+          wrapper.style.display = "grid";
+          wrapper.style.placeItems = "center";
+          wrapper.style.transform = `translate(${(markerIndex % 2) * 15 - 7}%, ${Math.floor(markerIndex / 2) * 15 - 7}%)`;
+          addGuideMarker(wrapper, item.glyph, item.step, item.kind);
+          cell.appendChild(wrapper);
+        });
 
       if (row === codingPuzzle.state.row && col === codingPuzzle.state.col) {
         const rover = document.createElement("span");
@@ -1008,15 +1225,17 @@ function renderCodingProgram(activeIndex = -1, doneThrough = -1) {
 }
 
 function addCodingCommand(command) {
-  if (codingRunning || codingProgram.length >= 30) return;
-  codingProgram.push(command);
+  if (codingRunning || codingProgram.length >= 32) return;
 
-  codingStatus.classList.remove("good", "bad");
-  codingStatus.textContent = codingProgram.length >= 30
+  codingProgram.push(command);
+  codingWinOverlay.classList.add("hidden");
+  codingStatus.classList.remove("good", "bad", "resetting");
+  codingStatus.textContent = codingProgram.length >= 32
     ? "Program full — press Run or remove a step."
     : "Build your program, then press Run.";
 
   renderCodingProgram();
+  renderCodingBoard();
   programTimeline.scrollLeft = programTimeline.scrollWidth;
 }
 
@@ -1027,19 +1246,34 @@ function setCodingControlsEnabled(enabled) {
   codingRun.disabled = !enabled;
   newCodingPuzzle.disabled = !enabled;
   codingLevelButtons.forEach(button => button.disabled = !enabled);
+  codingGuideToggle.disabled = !enabled;
 }
 
-function resetCodingRover() {
+function resetCodingRover(render = true) {
   codingPuzzle.state = {
     row: codingPuzzle.start.row,
     col: codingPuzzle.start.col,
     dir: 0
   };
-  renderCodingBoard();
+
+  if (render) renderCodingBoard();
 }
 
 function wait(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function returnRoverToStart(token) {
+  codingStatus.classList.add("resetting");
+  await wait(520);
+
+  if (token !== codingRunToken) return;
+
+  resetCodingRover();
+  renderCodingProgram();
+  codingStatus.classList.remove("resetting");
+  codingRunning = false;
+  setCodingControlsEnabled(true);
 }
 
 async function runCodingProgram() {
@@ -1054,9 +1288,10 @@ async function runCodingProgram() {
 
   codingRunning = true;
   const token = ++codingRunToken;
-  codingResult.classList.add("hidden");
+  codingWinOverlay.classList.add("hidden");
   setCodingControlsEnabled(false);
   resetCodingRover();
+  renderCodingBoard();
 
   let completedIndex = -1;
 
@@ -1074,10 +1309,7 @@ async function runCodingProgram() {
       const rover = $("#coding-rover");
       if (rover) rover.classList.add("bump");
 
-      await wait(430);
-      renderCodingProgram(-1, completedIndex);
-      codingRunning = false;
-      setCodingControlsEnabled(true);
+      await returnRoverToStart(token);
       return;
     }
 
@@ -1103,15 +1335,16 @@ async function runCodingProgram() {
   renderCodingProgram(-1, completedIndex);
   codingStatus.classList.remove("good");
   codingStatus.classList.add("bad");
-  codingStatus.textContent = "Not there yet — change the program and try again.";
-  codingRunning = false;
-  setCodingControlsEnabled(true);
+  codingStatus.textContent = "Not there yet — try changing your program.";
+  await returnRoverToStart(token);
 }
 
 function finishCodingSuccess(usedCommands) {
   codingRunning = false;
   renderCodingProgram(-1, usedCommands - 1);
-  codingStatus.classList.remove("bad");
+  renderCodingBoard();
+
+  codingStatus.classList.remove("bad", "resetting");
   codingStatus.classList.add("good");
   codingStatus.textContent = "You reached the flag!";
 
@@ -1119,14 +1352,13 @@ function finishCodingSuccess(usedCommands) {
   const extra = usedCommands - optimal;
   const stars = extra <= 1 ? 3 : extra <= 4 ? 2 : 1;
 
-  codingStars.textContent = "★".repeat(stars) + "☆".repeat(3 - stars);
-  codingResultTitle.textContent = "You made it!";
-  codingResultDetail.textContent =
+  codingWinStars.textContent = "★".repeat(stars) + "☆".repeat(3 - stars);
+  codingWinText.textContent =
     usedCommands === optimal
       ? `Perfect route — ${usedCommands} commands.`
       : `${usedCommands} commands. Best possible is ${optimal}.`;
 
-  codingResult.classList.remove("hidden");
+  codingWinOverlay.classList.remove("hidden");
   setCodingControlsEnabled(true);
 }
 
@@ -1137,21 +1369,33 @@ commandButtons.forEach(button => {
 codingUndo.addEventListener("click", () => {
   if (codingRunning || !codingProgram.length) return;
   codingProgram.pop();
+  codingWinOverlay.classList.add("hidden");
   renderCodingProgram();
+  renderCodingBoard();
 });
 
 codingClear.addEventListener("click", () => {
   if (codingRunning) return;
+
   codingProgram = [];
-  codingResult.classList.add("hidden");
-  resetCodingRover();
-  codingStatus.classList.remove("good", "bad");
+  codingWinOverlay.classList.add("hidden");
+  resetCodingRover(false);
+
+  codingStatus.classList.remove("good", "bad", "resetting");
   codingStatus.textContent = "Build your program, then press Run.";
+
   renderCodingProgram();
+  renderCodingBoard();
 });
 
 codingRun.addEventListener("click", runCodingProgram);
 newCodingPuzzle.addEventListener("click", buildCodingPuzzle);
+
+codingGuideToggle.addEventListener("change", () => {
+  codingGuideOn = codingGuideToggle.checked;
+  localStorage.setItem("codingGuideOn", codingGuideOn ? "true" : "false");
+  renderCodingBoard();
+});
 
 codingLevelButtons.forEach(button => {
   button.addEventListener("click", () => {
@@ -1173,7 +1417,6 @@ codingLevelButtons.forEach(button => {
 });
 
 buildCodingPuzzle();
-
 
 // ----------------------------
 // PWA service worker / update handling
