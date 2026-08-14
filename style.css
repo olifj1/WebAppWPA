@@ -1748,3 +1748,52 @@ input[type="range"] {
 .laser-emitter.dir-0{transform:rotate(0deg)}.laser-emitter.dir-1{transform:rotate(45deg)}.laser-emitter.dir-2{transform:rotate(90deg)}.laser-emitter.dir-3{transform:rotate(135deg)}.laser-emitter.dir-4{transform:rotate(180deg)}.laser-emitter.dir-5{transform:rotate(225deg)}.laser-emitter.dir-6{transform:rotate(270deg)}.laser-emitter.dir-7{transform:rotate(315deg)}
 .laser-beam-line.branch-1{stroke:rgba(255,88,88,.96)}.laser-beam-line.branch-2{stroke:rgba(255,153,90,.94)}.laser-beam-line.branch-3{stroke:rgba(255,213,97,.94)}.laser-beam-line.branch-4{stroke:rgba(112,220,255,.94)}
 .laser-info-row{grid-template-columns:repeat(3,1fr)}
+
+
+/* V9.1: simplified Coding learning guide */
+.guide-marker-simple {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.guide-simple-dot {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 24%;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: rgba(54,105,140,.30);
+  border: 2px solid rgba(54,105,140,.72);
+  box-shadow: 0 1px 4px rgba(40,60,75,.12);
+}
+
+.guide-simple-arrow {
+  position: absolute;
+  width: 30%;
+  height: 30%;
+  display: grid;
+  place-items: center;
+  color: #2d688e;
+  font-size: clamp(11px, 2.8vw, 16px);
+  font-weight: 900;
+  line-height: 1;
+  text-shadow: 0 1px 2px rgba(255,255,255,.65);
+}
+
+.guide-simple-arrow.dir-0 { left:50%; top:0%; transform:translateX(-50%) rotate(-90deg); }
+.guide-simple-arrow.dir-1 { right:0%; top:0%; transform:rotate(-45deg); }
+.guide-simple-arrow.dir-2 { right:0%; top:50%; transform:translateY(-50%) rotate(0deg); }
+.guide-simple-arrow.dir-3 { right:0%; bottom:0%; transform:rotate(45deg); }
+.guide-simple-arrow.dir-4 { left:50%; bottom:0%; transform:translateX(-50%) rotate(90deg); }
+.guide-simple-arrow.dir-5 { left:0%; bottom:0%; transform:rotate(135deg); }
+.guide-simple-arrow.dir-6 { left:0%; top:50%; transform:translateY(-50%) rotate(180deg); }
+.guide-simple-arrow.dir-7 { left:0%; top:0%; transform:rotate(225deg); }
+
+.guide-simple-arrow.collision {
+  color: #a84840;
+  font-size: clamp(10px, 2.6vw, 15px);
+}
