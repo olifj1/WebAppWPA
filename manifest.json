@@ -1,7 +1,7 @@
 {
   "name": "Learning Play",
   "short_name": "Learning Play",
-  "description": "Simple tactile learning activities for times tables, telling the time, sums, reading, coding and laser puzzles.",
+  "description": "Simple tactile learning activities for times tables, telling the time, sums, reading, coding and a build-your-own Laser Lab.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

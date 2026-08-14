@@ -285,46 +285,68 @@
           <header class="page-header laser-header">
             <p class="kicker">LEARNING PLAY</p>
             <h1 id="laser-title">Laser Lab</h1>
-            <p class="subhead">Place mirrors to bounce the beam through every checkpoint and into the target.</p>
+            <p class="subhead">Build a puzzle in Setup, then switch to Play and solve it with mirrors.</p>
           </header>
-          <div class="laser-topbar">
-            <div class="laser-levels" role="group" aria-label="Laser difficulty">
-              <button class="laser-level active" data-laser-level="easy">Easy</button>
-              <button class="laser-level" data-laser-level="medium">Medium</button>
-              <button class="laser-level" data-laser-level="hard">Hard</button>
-            </div>
-            <button class="laser-new" id="laser-new">New</button>
+
+          <div class="laser-mode-switch" role="group" aria-label="Laser Lab mode">
+            <button class="laser-mode-button active" data-laser-mode="setup">Setup</button>
+            <button class="laser-mode-button" data-laser-mode="play">Play</button>
           </div>
-          <div class="laser-pieces">
-            <button class="laser-piece active" data-laser-piece="mirror">
-              <span class="piece-icon mirror-tool-icon">╱</span>
-              <span>Mirror</span>
-            </button>
-            <button class="laser-piece" data-laser-piece="eraser">
-              <span class="piece-icon">⌫</span>
-              <span>Erase</span>
-            </button>
-            <div class="laser-piece-hint">
-              Tap a mirror again to rotate it
+
+          <div class="laser-setup-panel" id="laser-setup-panel">
+            <div class="laser-size-row">
+              <span>Grid</span>
+              <button class="laser-size-button" data-laser-size="small">8×10</button>
+              <button class="laser-size-button" data-laser-size="medium">9×12</button>
+              <button class="laser-size-button active" data-laser-size="large">10×14</button>
             </div>
+
+            <div class="laser-tools">
+              <button class="laser-tool active" data-laser-tool="emitter"><span class="laser-tool-icon">▶</span><span>Laser</span></button>
+              <button class="laser-tool" data-laser-tool="checkpoint"><span class="laser-tool-icon">○</span><span>Check</span></button>
+              <button class="laser-tool" data-laser-tool="target"><span class="laser-tool-icon">◎</span><span>Target</span></button>
+              <button class="laser-tool" data-laser-tool="splitter"><span class="laser-tool-icon">Y</span><span>Splitter</span></button>
+              <button class="laser-tool" data-laser-tool="block"><span class="laser-tool-icon">■</span><span>Block</span></button>
+              <button class="laser-tool" data-laser-tool="eraser"><span class="laser-tool-icon">⌫</span><span>Erase</span></button>
+            </div>
+
+            <div class="laser-help">Tap a square to place the selected piece. Tap an existing laser or splitter again to rotate it.</div>
+
+            <div class="laser-save-row">
+              <input id="laser-level-name" type="text" maxlength="28" placeholder="Level name">
+              <button id="laser-save-level" class="laser-save-button">Save</button>
+              <select id="laser-saved-levels" aria-label="Saved Laser Lab levels"><option value="">Saved levels…</option></select>
+              <button id="laser-load-level" class="laser-save-button">Load</button>
+              <button id="laser-delete-level" class="laser-save-button danger">Delete</button>
+            </div>
+          </div>
+
+          <div class="laser-play-panel hidden" id="laser-play-panel">
+            <div class="laser-tools play-tools">
+              <button class="laser-tool active" data-laser-play-tool="mirror"><span class="laser-tool-icon">╱</span><span>Mirror</span></button>
+              <button class="laser-tool" data-laser-play-tool="eraser"><span class="laser-tool-icon">⌫</span><span>Erase</span></button>
+              <button class="laser-save-button" id="laser-reset-play">Reset mirrors</button>
+            </div>
+            <div class="laser-help">Mirrors are unlimited. Tap a mirror again to rotate it through eight angles.</div>
           </div>
 
           <div class="laser-board-wrap">
-            <div class="laser-board" id="laser-board"></div>
-            <svg class="laser-beam-layer" id="laser-beam-layer" viewBox="0 0 600 700" preserveAspectRatio="none"></svg>
+            <div class="laser-board" id="laser-board" aria-label="Laser puzzle grid"></div>
+            <svg class="laser-beam-layer" id="laser-beam-layer" viewBox="0 0 1000 1400" preserveAspectRatio="none" aria-hidden="true"></svg>
           </div>
 
-          <div class="laser-status" id="laser-status">Place mirrors and watch the beam update.</div>
+          <div class="laser-status" id="laser-status">Place a laser, at least one target, then build your puzzle.</div>
 
           <div class="laser-result hidden" id="laser-result" aria-live="polite">
-            <span class="laser-result-stars" id="laser-result-stars">★★★</span>
-            <strong>Target hit!</strong>
-            <span id="laser-result-text">Great reflecting!</span>
+            <span class="laser-result-stars">★★★</span>
+            <strong>Puzzle solved!</strong>
+            <span id="laser-result-text">Every target and checkpoint was hit.</span>
           </div>
 
           <div class="laser-info-row">
-            <div class="laser-info-pill"><span>MIRRORS</span><strong id="laser-mirror-count">0 / 3</strong></div>
-            <div class="laser-info-pill"><span>CHECKPOINTS</span><strong id="laser-checkpoint-count">0 / 1</strong></div>
+            <div class="laser-info-pill"><span>MIRRORS</span><strong id="laser-mirror-count">0</strong></div>
+            <div class="laser-info-pill"><span>CHECKPOINTS</span><strong id="laser-checkpoint-count">0 / 0</strong></div>
+            <div class="laser-info-pill"><span>TARGETS</span><strong id="laser-target-count">0 / 0</strong></div>
           </div>
         </div>
       </section>

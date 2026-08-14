@@ -1435,612 +1435,418 @@ buildCodingPuzzle();
 
 
 // ----------------------------
-// Laser Lab
+// Laser Lab - builder + play modes
 // ----------------------------
 const laserBoard = $("#laser-board");
 const laserBeamLayer = $("#laser-beam-layer");
 const laserStatus = $("#laser-status");
-const laserLevelButtons = $$("[data-laser-level]");
-const laserPieceButtons = $$("[data-laser-piece]");
-const laserNewButton = $("#laser-new");
+const laserModeButtons = $$("[data-laser-mode]");
+const laserSizeButtons = $$("[data-laser-size]");
+const laserSetupTools = $$("[data-laser-tool]");
+const laserPlayTools = $$("[data-laser-play-tool]");
+const laserSetupPanel = $("#laser-setup-panel");
+const laserPlayPanel = $("#laser-play-panel");
 const laserMirrorCount = $("#laser-mirror-count");
 const laserCheckpointCount = $("#laser-checkpoint-count");
+const laserTargetCount = $("#laser-target-count");
 const laserResult = $("#laser-result");
-const laserResultStars = $("#laser-result-stars");
 const laserResultText = $("#laser-result-text");
+const laserLevelName = $("#laser-level-name");
+const laserSaveButton = $("#laser-save-level");
+const laserSavedLevels = $("#laser-saved-levels");
+const laserLoadButton = $("#laser-load-level");
+const laserDeleteButton = $("#laser-delete-level");
+const laserResetPlay = $("#laser-reset-play");
 
-const laserLevelInfo = {
-  easy: {
-    rows: 10,
-    cols: 8,
-    mirrors: 3,
-    checkpoints: 1,
-    extraOpen: 18
-  },
-  medium: {
-    rows: 12,
-    cols: 9,
-    mirrors: 5,
-    checkpoints: 2,
-    extraOpen: 10
-  },
-  hard: {
-    rows: 14,
-    cols: 10,
-    mirrors: 7,
-    checkpoints: 3,
-    extraOpen: 4
-  }
+const laserGridSizes = {
+  small: { rows: 10, cols: 8 },
+  medium: { rows: 12, cols: 9 },
+  large: { rows: 14, cols: 10 }
 };
 
-// Direction indices clockwise in 45° steps:
-// 0=N, 1=NE, 2=E, 3=SE, 4=S, 5=SW, 6=W, 7=NW.
 const laserDirVectors = [
-  [-1, 0],
-  [-1, 1],
-  [0, 1],
-  [1, 1],
-  [1, 0],
-  [1, -1],
-  [0, -1],
-  [-1, -1]
+  [-1, 0], [-1, 1], [0, 1], [1, 1],
+  [1, 0], [1, -1], [0, -1], [-1, -1]
 ];
 
-let laserLevel = localStorage.getItem("laserLevel") || "easy";
-let laserSelectedPiece = "mirror";
-let laserPuzzle = null;
-let laserPlaced = new Map();
+let laserMode = "setup";
+let laserGridSize = "large";
+let laserRowsCount = 14;
+let laserColsCount = 10;
+let laserSetupTool = "emitter";
+let laserPlayTool = "mirror";
 
-function laserInfo() {
-  return laserLevelInfo[laserLevel];
-}
+let laserLevel = {
+  emitter: null,
+  checkpoints: [],
+  targets: [],
+  splitters: new Map(),
+  blocks: new Set()
+};
 
-function laserRows() {
-  return laserInfo().rows;
-}
+let laserMirrors = new Map();
 
-function laserCols() {
-  return laserInfo().cols;
-}
-
-function laserKey(row, col) {
-  return `${row},${col}`;
-}
-
+function laserKey(row, col) { return `${row},${col}`; }
 function laserInBounds(row, col) {
-  return row >= 0 && row < laserRows() && col >= 0 && col < laserCols();
+  return row >= 0 && row < laserRowsCount && col >= 0 && col < laserColsCount;
 }
-
-function laserDirAngle(dir) {
-  return (dir * 45 - 90 + 360) % 360;
-}
-
-function mirrorLineAngle(orientation) {
-  return orientation * 22.5;
-}
-
-function normalizeAngle(angle) {
-  angle %= 360;
-  if (angle < 0) angle += 360;
-  return angle;
-}
-
+function laserDirAngle(dir) { return (dir * 45 - 90 + 360) % 360; }
+function mirrorLineAngle(orientation) { return orientation * 22.5; }
+function normalizeAngle(angle) { angle %= 360; return angle < 0 ? angle + 360 : angle; }
 function angleToLaserDir(angle) {
-  const normalized = normalizeAngle(angle);
-  const dir = Math.round((normalized + 90) / 45);
+  const dir = Math.round((normalizeAngle(angle) + 90) / 45);
   return ((dir % 8) + 8) % 8;
 }
-
 function laserReflect(dir, orientation) {
-  const incoming = laserDirAngle(dir);
-  const mirror = mirrorLineAngle(orientation);
-  return angleToLaserDir(2 * mirror - incoming);
+  return angleToLaserDir(2 * mirrorLineAngle(orientation) - laserDirAngle(dir));
+}
+function laserCellCenter(row, col) { return [(col + .5) * 100, (row + .5) * 100]; }
+
+function setLaserGridSize(sizeName) {
+  laserGridSize = sizeName;
+  const size = laserGridSizes[sizeName];
+  laserRowsCount = size.rows;
+  laserColsCount = size.cols;
+  laserLevel = { emitter: null, checkpoints: [], targets: [], splitters: new Map(), blocks: new Set() };
+  laserMirrors = new Map();
+  laserSizeButtons.forEach(b => b.classList.toggle("active", b.dataset.laserSize === sizeName));
+  renderLaserBoard(); traceLaser();
 }
 
-function mirrorOrientationForTurn(inDir, outDir) {
-  for (let orientation = 0; orientation < 8; orientation++) {
-    if (laserReflect(inDir, orientation) === outDir) return orientation;
-  }
-  return null;
-}
-
-function laserDirectionBetween(a, b) {
-  const dr = Math.sign(b.row - a.row);
-  const dc = Math.sign(b.col - a.col);
-  return laserDirVectors.findIndex(([r, c]) => r === dr && c === dc);
-}
-
-function addStraightSegment(route, from, to) {
-  // Move diagonally while both axes still need movement, then finish
-  // along the remaining axis. This always terminates and only uses
-  // the 8 directions the laser understands.
-  let row = from.row;
-  let col = from.col;
-  let guard = 0;
-
-  while ((row !== to.row || col !== to.col) && guard++ < 200) {
-    const dr = Math.sign(to.row - row);
-    const dc = Math.sign(to.col - col);
-
-    row += dr;
-    col += dc;
-    route.push({ row, col });
-  }
-
-  if (guard >= 200) {
-    throw new Error("Laser route segment failed to converge.");
-  }
-}
-
-function rotateTemplatePoint(point, rows, cols, rotation) {
-  const r = point.row;
-  const c = point.col;
-
-  if (rotation === 0) return { row: r, col: c };
-  if (rotation === 1) return { row: c, col: rows - 1 - r };
-  if (rotation === 2) return { row: rows - 1 - r, col: cols - 1 - c };
-  return { row: cols - 1 - c, col: r };
-}
-
-// Constructive generator: builds a known-good route directly from a few safe templates.
-// No recursive search, no repeated brute-force retries.
-function buildConstructiveLaserPuzzle() {
-  const info = laserInfo();
-  const rows = info.rows;
-  const cols = info.cols;
-
-  // Template lives in current board coordinates. We deliberately use mostly
-  // orthogonal travel with a couple of diagonals so reflection stays readable.
-  let waypoints;
-
-  if (laserLevel === "easy") {
-    waypoints = [
-      { row: rows - 1, col: 1 },
-      { row: rows - 5, col: 1 },
-      { row: rows - 7, col: 3 },
-      { row: 2, col: 3 },
-      { row: 0, col: cols - 2 }
-    ];
-  } else if (laserLevel === "medium") {
-    waypoints = [
-      { row: rows - 1, col: 1 },
-      { row: rows - 5, col: 1 },
-      { row: rows - 7, col: 3 },
-      { row: rows - 7, col: cols - 3 },
-      { row: rows - 10, col: cols - 3 },
-      { row: 2, col: 3 },
-      { row: 0, col: cols - 2 }
-    ];
-  } else {
-    waypoints = [
-      { row: rows - 1, col: 1 },
-      { row: rows - 5, col: 1 },
-      { row: rows - 7, col: 3 },
-      { row: rows - 7, col: cols - 3 },
-      { row: rows - 10, col: cols - 3 },
-      { row: rows - 10, col: 3 },
-      { row: 4, col: 3 },
-      { row: 2, col: cols - 3 },
-      { row: 0, col: cols - 2 }
-    ];
-  }
-
-  // Horizontal mirror for variety.
-  if (Math.random() < 0.5) {
-    waypoints = waypoints.map(p => ({ row: p.row, col: cols - 1 - p.col }));
-  }
-
-  // Small vertical variation on internal waypoints, clamped to safe interior cells.
-  for (let i = 1; i < waypoints.length - 1; i++) {
-    if (Math.random() < 0.35) {
-      const delta = Math.random() < 0.5 ? -1 : 1;
-      waypoints[i].row = Math.max(1, Math.min(rows - 2, waypoints[i].row + delta));
-    }
-  }
-
-  const route = [{ ...waypoints[0] }];
-  for (let i = 1; i < waypoints.length; i++) {
-    addStraightSegment(route, waypoints[i - 1], waypoints[i]);
-  }
-
-  // Remove accidental duplicate cells from waypoint joins.
-  const compactRoute = [];
-  const seen = new Set();
-  for (const cell of route) {
-    const key = laserKey(cell.row, cell.col);
-    if (seen.has(key)) continue;
-    seen.add(key);
-    compactRoute.push(cell);
-  }
-
-  // Work out the emitter direction from first move.
-  const emitter = {
-    row: compactRoute[0].row,
-    col: compactRoute[0].col,
-    dir: laserDirectionBetween(compactRoute[0], compactRoute[1])
-  };
-
-  const target = {
-    row: compactRoute[compactRoute.length - 1].row,
-    col: compactRoute[compactRoute.length - 1].col
-  };
-
-  const mirrorCells = [];
-  let inDir = emitter.dir;
-
-  for (let i = 1; i < compactRoute.length - 1; i++) {
-    const outDir = laserDirectionBetween(compactRoute[i], compactRoute[i + 1]);
-    if (outDir !== inDir) {
-      const orientation = mirrorOrientationForTurn(inDir, outDir);
-      if (orientation !== null) {
-        mirrorCells.push({
-          row: compactRoute[i].row,
-          col: compactRoute[i].col,
-          orientation
-        });
-      }
-      inDir = outDir;
-    }
-  }
-
-  // If a random variation shortened the number of corners, supplement with
-  // route corners only up to the level target. Never exceed the actual route.
-  const desiredMirrors = info.mirrors;
-  const usableMirrors = mirrorCells.slice(0, desiredMirrors);
-
-  // Choose checkpoints from straight cells and spread them evenly across the route.
-  const mirrorKeys = new Set(usableMirrors.map(m => laserKey(m.row, m.col)));
-
-  const straightCandidates = compactRoute
-    .map((cell, index) => ({ ...cell, index }))
-    .filter(item => {
-      if (item.index <= 1 || item.index >= compactRoute.length - 2) return false;
-      if (mirrorKeys.has(laserKey(item.row, item.col))) return false;
-
-      const prev = compactRoute[item.index - 1];
-      const next = compactRoute[item.index + 1];
-      return laserDirectionBetween(prev, item) === laserDirectionBetween(item, next);
-    });
-
-  const checkpoints = [];
-  for (let i = 0; i < info.checkpoints; i++) {
-    const targetIndex = Math.round(
-      ((i + 1) / (info.checkpoints + 1)) * (compactRoute.length - 1)
-    );
-
-    let best = null;
-    for (const candidate of straightCandidates) {
-      if (checkpoints.some(cp => cp.row === candidate.row && cp.col === candidate.col)) continue;
-      const distance = Math.abs(candidate.index - targetIndex);
-      if (!best || distance < best.distance) {
-        best = { candidate, distance };
-      }
-    }
-
-    if (best) {
-      checkpoints.push({
-        row: best.candidate.row,
-        col: best.candidate.col
-      });
-    }
-  }
-
-  const routeKeys = new Set(compactRoute.map(cell => laserKey(cell.row, cell.col)));
-  const obstacles = new Set();
-
-  for (let row = 0; row < rows; row++) {
-    for (let col = 0; col < cols; col++) {
-      const key = laserKey(row, col);
-      if (!routeKeys.has(key)) obstacles.add(key);
-    }
-  }
-
-  // Open a limited number of decoy cells. We choose deterministically-ish from
-  // shuffled candidates, but this is cheap and never retries generation.
-  const obstacleList = [...obstacles].sort(() => Math.random() - .5);
-  let opened = 0;
-
-  for (const key of obstacleList) {
-    if (opened >= info.extraOpen) break;
-
-    const [row, col] = key.split(",").map(Number);
-    const onEdge =
-      row === 0 || row === rows - 1 ||
-      col === 0 || col === cols - 1;
-
-    if (onEdge) continue;
-
-    obstacles.delete(key);
-    opened++;
-  }
-
-  return {
-    emitter,
-    target,
-    checkpoints,
-    obstacles,
-    solutionMirrors: usableMirrors,
-    mirrorLimit: usableMirrors.length,
-    route: compactRoute
-  };
-}
-
-function buildLaserPuzzle() {
-  laserPlaced = new Map();
+function setLaserMode(mode) {
+  laserMode = mode;
+  laserModeButtons.forEach(b => b.classList.toggle("active", b.dataset.laserMode === mode));
+  laserSetupPanel.classList.toggle("hidden", mode !== "setup");
+  laserPlayPanel.classList.toggle("hidden", mode !== "play");
   laserResult.classList.add("hidden");
-
-  laserPuzzle = buildConstructiveLaserPuzzle();
-
-  const info = laserInfo();
-  laserBoard.style.setProperty("--laser-cols", info.cols);
-  laserBoard.style.setProperty("--laser-rows", info.rows);
-  laserBoard.style.aspectRatio = `${info.cols} / ${info.rows}`;
-
-  renderLaserBoard();
-  traceLaser();
+  renderLaserBoard(); traceLaser();
 }
 
-function emitterClassFromDir(dir) {
-  if (dir === 2) return "dir-right";
-  if (dir === 6) return "dir-left";
-  if (dir === 0) return "dir-up";
-  if (dir === 4) return "dir-down";
-  return "dir-right";
+function clearLaserCell(row, col) {
+  const key = laserKey(row, col);
+  if (laserLevel.emitter && laserLevel.emitter.row === row && laserLevel.emitter.col === col) laserLevel.emitter = null;
+  laserLevel.checkpoints = laserLevel.checkpoints.filter(x => !(x.row === row && x.col === col));
+  laserLevel.targets = laserLevel.targets.filter(x => !(x.row === row && x.col === col));
+  laserLevel.splitters.delete(key);
+  laserLevel.blocks.delete(key);
+  laserMirrors.delete(key);
+}
+
+function cellHasFixedObject(row, col) {
+  const key = laserKey(row, col);
+  return !!(
+    (laserLevel.emitter && laserLevel.emitter.row === row && laserLevel.emitter.col === col) ||
+    laserLevel.checkpoints.some(x => x.row === row && x.col === col) ||
+    laserLevel.targets.some(x => x.row === row && x.col === col) ||
+    laserLevel.splitters.has(key) ||
+    laserLevel.blocks.has(key)
+  );
+}
+
+function handleLaserSetupTap(row, col) {
+  const key = laserKey(row, col);
+
+  if (laserSetupTool === "eraser") {
+    clearLaserCell(row, col);
+    renderLaserBoard(); traceLaser(); return;
+  }
+
+  if (laserSetupTool === "emitter" && laserLevel.emitter &&
+      laserLevel.emitter.row === row && laserLevel.emitter.col === col) {
+    laserLevel.emitter.dir = (laserLevel.emitter.dir + 1) % 8;
+    renderLaserBoard(); traceLaser(); return;
+  }
+
+  if (laserSetupTool === "splitter" && laserLevel.splitters.has(key)) {
+    laserLevel.splitters.set(key, (laserLevel.splitters.get(key) + 1) % 8);
+    renderLaserBoard(); traceLaser(); return;
+  }
+
+  clearLaserCell(row, col);
+
+  if (laserSetupTool === "emitter") laserLevel.emitter = { row, col, dir: 2 };
+  if (laserSetupTool === "checkpoint") laserLevel.checkpoints.push({ row, col });
+  if (laserSetupTool === "target") laserLevel.targets.push({ row, col });
+  if (laserSetupTool === "splitter") laserLevel.splitters.set(key, 2);
+  if (laserSetupTool === "block") laserLevel.blocks.add(key);
+
+  renderLaserBoard(); traceLaser();
+}
+
+function handleLaserPlayTap(row, col) {
+  const key = laserKey(row, col);
+  if (cellHasFixedObject(row, col)) return;
+
+  if (laserPlayTool === "eraser") laserMirrors.delete(key);
+  else if (laserMirrors.has(key)) laserMirrors.set(key, (laserMirrors.get(key) + 1) % 8);
+  else laserMirrors.set(key, 2);
+
+  laserResult.classList.add("hidden");
+  renderLaserBoard(); traceLaser();
 }
 
 function renderLaserBoard() {
   laserBoard.innerHTML = "";
+  laserBoard.style.setProperty("--laser-cols", laserColsCount);
+  laserBoard.style.setProperty("--laser-rows", laserRowsCount);
 
-  for (let row = 0; row < laserRows(); row++) {
-    for (let col = 0; col < laserCols(); col++) {
+  for (let row = 0; row < laserRowsCount; row++) {
+    for (let col = 0; col < laserColsCount; col++) {
       const key = laserKey(row, col);
       const cell = document.createElement("button");
       cell.type = "button";
       cell.className = "laser-cell";
-      cell.dataset.row = row;
-      cell.dataset.col = col;
 
-      if (laserPuzzle.obstacles.has(key)) {
-        cell.classList.add("obstacle");
-        cell.disabled = true;
-      }
+      if (laserLevel.blocks.has(key)) cell.classList.add("obstacle");
 
-      const isEmitter =
-        row === laserPuzzle.emitter.row &&
-        col === laserPuzzle.emitter.col;
-
-      const isTarget =
-        row === laserPuzzle.target.row &&
-        col === laserPuzzle.target.col;
-
-      const checkpoint = laserPuzzle.checkpoints.find(
-        cp => cp.row === row && cp.col === col
-      );
-
-      if (isEmitter) {
+      if (laserLevel.emitter && laserLevel.emitter.row === row && laserLevel.emitter.col === col) {
         cell.classList.add("emitter-cell");
-        const emitter = document.createElement("span");
-        emitter.className = `laser-emitter ${emitterClassFromDir(laserPuzzle.emitter.dir)}`;
-        cell.appendChild(emitter);
-        cell.disabled = true;
+        const e = document.createElement("span");
+        e.className = `laser-emitter dir-${laserLevel.emitter.dir}`;
+        cell.appendChild(e);
       }
 
-      if (isTarget) {
+      if (laserLevel.targets.some(x => x.row === row && x.col === col)) {
         cell.classList.add("target-cell");
-        const target = document.createElement("span");
-        target.className = "laser-target";
-        target.id = "laser-target-indicator";
-        cell.appendChild(target);
-        cell.disabled = true;
+        const t = document.createElement("span");
+        t.className = "laser-target"; t.dataset.target = key; cell.appendChild(t);
       }
 
-      if (checkpoint) {
+      if (laserLevel.checkpoints.some(x => x.row === row && x.col === col)) {
         cell.classList.add("checkpoint-cell");
-        const marker = document.createElement("span");
-        marker.className = "laser-checkpoint";
-        marker.dataset.checkpoint = key;
-        cell.appendChild(marker);
+        const c = document.createElement("span");
+        c.className = "laser-checkpoint"; c.dataset.checkpoint = key; cell.appendChild(c);
       }
 
-      if (laserPlaced.has(key)) {
-        const orientation = laserPlaced.get(key);
-        const mirror = document.createElement("span");
-        mirror.className = `laser-mirror angle-${orientation}`;
-        cell.appendChild(mirror);
+      if (laserLevel.splitters.has(key)) {
+        const s = document.createElement("span");
+        s.className = `laser-splitter angle-${laserLevel.splitters.get(key)}`;
+        cell.appendChild(s);
       }
 
-      if (!cell.disabled) {
-        cell.addEventListener("click", () => placeLaserPiece(row, col));
+      if (laserMirrors.has(key)) {
+        const m = document.createElement("span");
+        m.className = `laser-mirror angle-${laserMirrors.get(key)}`;
+        cell.appendChild(m);
       }
+
+      cell.addEventListener("click", () => {
+        if (laserMode === "setup") handleLaserSetupTap(row, col);
+        else handleLaserPlayTap(row, col);
+      });
 
       laserBoard.appendChild(cell);
     }
   }
 }
 
-function placeLaserPiece(row, col) {
-  const key = laserKey(row, col);
+function traceSingleBeam(state, branchIndex, hitCheckpoints, hitTargets, queue) {
+  const points = [];
+  const seen = new Set();
+  let { row, col, dir } = state;
+  points.push(laserCellCenter(row, col));
 
-  if (laserPuzzle.obstacles.has(key)) return;
-  if (row === laserPuzzle.emitter.row && col === laserPuzzle.emitter.col) return;
-  if (row === laserPuzzle.target.row && col === laserPuzzle.target.col) return;
+  for (let step = 0; step < 500; step++) {
+    const stateKey = `${row},${col},${dir}`;
+    if (seen.has(stateKey)) break;
+    seen.add(stateKey);
 
-  const isCheckpoint = laserPuzzle.checkpoints.some(
-    checkpoint => checkpoint.row === row && checkpoint.col === col
-  );
+    const [dr, dc] = laserDirVectors[dir];
+    const nr = row + dr, nc = col + dc;
 
-  if (isCheckpoint) {
-    laserStatus.classList.remove("good");
-    laserStatus.classList.add("bad");
-    laserStatus.textContent = "Checkpoints must stay clear so the beam can pass through.";
-    return;
-  }
+    if (!laserInBounds(nr, nc)) {
+      points.push([(col + .5 + dc * .5) * 100, (row + .5 + dr * .5) * 100]);
+      break;
+    }
 
-  if (laserSelectedPiece === "eraser") {
-    laserPlaced.delete(key);
-  } else {
-    if (laserPlaced.has(key)) {
-      laserPlaced.set(key, (laserPlaced.get(key) + 1) % 8);
-    } else {
-      if (laserPlaced.size >= laserPuzzle.mirrorLimit) {
-        laserStatus.classList.remove("good");
-        laserStatus.classList.add("bad");
-        laserStatus.textContent = "No mirrors left — rotate one or erase one.";
-        return;
+    const key = laserKey(nr, nc);
+    if (laserLevel.blocks.has(key)) {
+      points.push([(col + .5 + dc * .5) * 100, (row + .5 + dr * .5) * 100]);
+      break;
+    }
+
+    row = nr; col = nc; points.push(laserCellCenter(row, col));
+
+    if (laserLevel.checkpoints.some(x => x.row === row && x.col === col)) hitCheckpoints.add(key);
+
+    if (laserLevel.targets.some(x => x.row === row && x.col === col)) {
+      hitTargets.add(key);
+      break;
+    }
+
+    if (laserMirrors.has(key)) {
+      dir = laserReflect(dir, laserMirrors.get(key));
+      continue;
+    }
+
+    if (laserLevel.splitters.has(key)) {
+      const reflected = laserReflect(dir, laserLevel.splitters.get(key));
+      if (reflected !== dir) {
+        queue.push({ row, col, dir: reflected, branchIndex: branchIndex + queue.length + 1 });
       }
-
-      laserPlaced.set(key, 2);
     }
   }
 
-  laserResult.classList.add("hidden");
-  renderLaserBoard();
-  traceLaser();
-}
-
-function laserCellCenter(row, col) {
-  return [(col + 0.5) * 100, (row + 0.5) * 100];
+  return points;
 }
 
 function traceLaser() {
   laserBeamLayer.innerHTML = "";
+  laserBeamLayer.setAttribute("viewBox", `0 0 ${laserColsCount * 100} ${laserRowsCount * 100}`);
 
-  const width = laserCols() * 100;
-  const height = laserRows() * 100;
-  laserBeamLayer.setAttribute("viewBox", `0 0 ${width} ${height}`);
-
-  laserStatus.classList.remove("good", "bad");
-
-  const points = [];
-  let row = laserPuzzle.emitter.row;
-  let col = laserPuzzle.emitter.col;
-  let dir = laserPuzzle.emitter.dir;
-  let hitTarget = false;
   const hitCheckpoints = new Set();
-  const seenStates = new Set();
+  const hitTargets = new Set();
 
-  points.push(laserCellCenter(row, col));
+  if (!laserLevel.emitter) {
+    updateLaserStats(hitCheckpoints, hitTargets);
+    laserStatus.textContent = laserMode === "setup"
+      ? "Place a laser, at least one target, then build your puzzle."
+      : "This level needs a laser.";
+    return;
+  }
 
-  for (let steps = 0; steps < 350; steps++) {
-    const stateKey = `${row},${col},${dir}`;
-    if (seenStates.has(stateKey)) break;
-    seenStates.add(stateKey);
+  const queue = [{ ...laserLevel.emitter, branchIndex: 1 }];
+  let processed = 0;
 
-    const [dr, dc] = laserDirVectors[dir];
-    const nr = row + dr;
-    const nc = col + dc;
-
-    if (!laserInBounds(nr, nc)) {
-      points.push([
-        (col + 0.5 + dc * 0.5) * 100,
-        (row + 0.5 + dr * 0.5) * 100
-      ]);
-      break;
-    }
-
-    if (laserPuzzle.obstacles.has(laserKey(nr, nc))) {
-      points.push([
-        (col + 0.5 + dc * 0.5) * 100,
-        (row + 0.5 + dr * 0.5) * 100
-      ]);
-      break;
-    }
-
-    row = nr;
-    col = nc;
-    points.push(laserCellCenter(row, col));
-
-    const key = laserKey(row, col);
-
-    if (laserPuzzle.checkpoints.some(cp => laserKey(cp.row, cp.col) === key)) {
-      hitCheckpoints.add(key);
-    }
-
-    if (row === laserPuzzle.target.row && col === laserPuzzle.target.col) {
-      hitTarget = true;
-      break;
-    }
-
-    if (laserPlaced.has(key)) {
-      dir = laserReflect(dir, laserPlaced.get(key));
+  while (queue.length && processed < 32) {
+    const beam = queue.shift();
+    processed++;
+    const points = traceSingleBeam(beam, beam.branchIndex, hitCheckpoints, hitTargets, queue);
+    if (points.length > 1) {
+      const line = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
+      line.setAttribute("class", `laser-beam-line branch-${((processed - 1) % 4) + 1}`);
+      line.setAttribute("points", points.map(([x,y]) => `${x},${y}`).join(" "));
+      laserBeamLayer.appendChild(line);
     }
   }
 
-  const polyline = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
-  polyline.setAttribute("class", "laser-beam-line");
-  polyline.setAttribute("points", points.map(([x, y]) => `${x},${y}`).join(" "));
-  laserBeamLayer.appendChild(polyline);
+  document.querySelectorAll(".laser-checkpoint").forEach(m => m.classList.toggle("hit", hitCheckpoints.has(m.dataset.checkpoint)));
+  document.querySelectorAll(".laser-target").forEach(m => m.classList.toggle("hit", hitTargets.has(m.dataset.target)));
 
-  document.querySelectorAll(".laser-checkpoint").forEach(marker => {
-    marker.classList.toggle("hit", hitCheckpoints.has(marker.dataset.checkpoint));
-  });
+  updateLaserStats(hitCheckpoints, hitTargets);
 
-  const targetIndicator = $("#laser-target-indicator");
-  if (targetIndicator) targetIndicator.classList.toggle("hit", hitTarget);
+  const checkpointsOkay = laserLevel.checkpoints.length === 0 || hitCheckpoints.size === laserLevel.checkpoints.length;
+  const targetsOkay = laserLevel.targets.length > 0 && hitTargets.size === laserLevel.targets.length;
 
-  const mirrorsUsed = laserPlaced.size;
-  laserMirrorCount.textContent = `${mirrorsUsed} / ${laserPuzzle.mirrorLimit}`;
-  laserCheckpointCount.textContent = `${hitCheckpoints.size} / ${laserPuzzle.checkpoints.length}`;
-
-  const allCheckpointsHit =
-    hitCheckpoints.size === laserPuzzle.checkpoints.length;
-
-  if (hitTarget && allCheckpointsHit) {
+  if (laserMode === "play" && checkpointsOkay && targetsOkay) {
     laserStatus.classList.add("good");
-    laserStatus.textContent = "Perfect — the whole beam path is complete!";
-
-    const optimal = laserPuzzle.solutionMirrors.length;
-    const extra = mirrorsUsed - optimal;
-    const stars = extra <= 0 ? 3 : extra === 1 ? 2 : 1;
-
-    laserResultStars.textContent =
-      "★".repeat(stars) + "☆".repeat(3 - stars);
-
-    laserResultText.textContent =
-      mirrorsUsed === optimal
-        ? `Perfect solution — ${mirrorsUsed} mirrors.`
-        : `${mirrorsUsed} mirrors used. Best is ${optimal}.`;
-
+    laserStatus.textContent = "Puzzle solved!";
+    laserResultText.textContent = "Every target and checkpoint was hit.";
     laserResult.classList.remove("hidden");
-  } else if (hitTarget && !allCheckpointsHit) {
-    laserStatus.classList.add("bad");
-    laserStatus.textContent = "The target was hit, but a checkpoint was missed.";
-    laserResult.classList.add("hidden");
   } else {
-    laserStatus.textContent = "Place mirrors, then watch the beam update.";
+    laserStatus.classList.remove("good","bad");
     laserResult.classList.add("hidden");
+    if (laserMode === "play") {
+      laserStatus.textContent = laserLevel.targets.length
+        ? "Place mirrors to hit every checkpoint and target."
+        : "This level needs at least one target.";
+    }
   }
 }
 
-laserPieceButtons.forEach(button => {
-  button.addEventListener("click", () => {
-    laserSelectedPiece = button.dataset.laserPiece;
-    laserPieceButtons.forEach(b =>
-      b.classList.toggle("active", b === button)
-    );
+function updateLaserStats(hitCheckpoints, hitTargets) {
+  laserMirrorCount.textContent = String(laserMirrors.size);
+  laserCheckpointCount.textContent = `${hitCheckpoints.size} / ${laserLevel.checkpoints.length}`;
+  laserTargetCount.textContent = `${hitTargets.size} / ${laserLevel.targets.length}`;
+}
+
+function serializeLaserLevel() {
+  return {
+    version: 1,
+    name: laserLevelName.value.trim() || "Untitled Laser Level",
+    gridSize: laserGridSize,
+    rows: laserRowsCount, cols: laserColsCount,
+    emitter: laserLevel.emitter,
+    checkpoints: laserLevel.checkpoints,
+    targets: laserLevel.targets,
+    splitters: [...laserLevel.splitters.entries()],
+    blocks: [...laserLevel.blocks]
+  };
+}
+
+function deserializeLaserLevel(data) {
+  const sizeName = data.gridSize && laserGridSizes[data.gridSize] ? data.gridSize : "large";
+  laserGridSize = sizeName;
+  laserRowsCount = data.rows || laserGridSizes[sizeName].rows;
+  laserColsCount = data.cols || laserGridSizes[sizeName].cols;
+  laserLevel = {
+    emitter: data.emitter || null,
+    checkpoints: Array.isArray(data.checkpoints) ? data.checkpoints : [],
+    targets: Array.isArray(data.targets) ? data.targets : [],
+    splitters: new Map(Array.isArray(data.splitters) ? data.splitters : []),
+    blocks: new Set(Array.isArray(data.blocks) ? data.blocks : [])
+  };
+  laserMirrors = new Map();
+  laserLevelName.value = data.name || "";
+  laserSizeButtons.forEach(b => b.classList.toggle("active", b.dataset.laserSize === sizeName));
+  setLaserMode("setup");
+}
+
+function getSavedLaserLevels() {
+  try { return JSON.parse(localStorage.getItem("laserLabSavedLevels") || "{}"); }
+  catch { return {}; }
+}
+function storeSavedLaserLevels(levels) {
+  localStorage.setItem("laserLabSavedLevels", JSON.stringify(levels));
+}
+function refreshSavedLaserLevels() {
+  const levels = getSavedLaserLevels();
+  laserSavedLevels.innerHTML = '<option value="">Saved levels…</option>';
+  Object.keys(levels).sort().forEach(name => {
+    const option = document.createElement("option");
+    option.value = name; option.textContent = name; laserSavedLevels.appendChild(option);
   });
+}
+
+laserModeButtons.forEach(b => b.addEventListener("click", () => setLaserMode(b.dataset.laserMode)));
+laserSizeButtons.forEach(b => b.addEventListener("click", () => setLaserGridSize(b.dataset.laserSize)));
+laserSetupTools.forEach(b => b.addEventListener("click", () => {
+  laserSetupTool = b.dataset.laserTool;
+  laserSetupTools.forEach(x => x.classList.toggle("active", x === b));
+}));
+laserPlayTools.forEach(b => b.addEventListener("click", () => {
+  if (!b.dataset.laserPlayTool) return;
+  laserPlayTool = b.dataset.laserPlayTool;
+  laserPlayTools.forEach(x => { if (x.dataset.laserPlayTool) x.classList.toggle("active", x === b); });
+}));
+
+laserResetPlay.addEventListener("click", () => {
+  laserMirrors = new Map(); laserResult.classList.add("hidden"); renderLaserBoard(); traceLaser();
 });
 
-laserLevelButtons.forEach(button => {
-  button.addEventListener("click", () => {
-    laserLevel = button.dataset.laserLevel;
-    localStorage.setItem("laserLevel", laserLevel);
-
-    laserLevelButtons.forEach(b => {
-      b.classList.toggle("active", b.dataset.laserLevel === laserLevel);
-    });
-
-    buildLaserPuzzle();
-  });
+laserSaveButton.addEventListener("click", () => {
+  const data = serializeLaserLevel();
+  const levels = getSavedLaserLevels();
+  levels[data.name] = data;
+  storeSavedLaserLevels(levels);
+  refreshSavedLaserLevels();
+  laserSavedLevels.value = data.name;
+  laserStatus.textContent = `Saved "${data.name}".`;
 });
 
-laserLevelButtons.forEach(button => {
-  button.classList.toggle("active", button.dataset.laserLevel === laserLevel);
+laserLoadButton.addEventListener("click", () => {
+  const name = laserSavedLevels.value;
+  if (!name) return;
+  const levels = getSavedLaserLevels();
+  if (!levels[name]) return;
+  deserializeLaserLevel(levels[name]);
+  laserStatus.textContent = `Loaded "${name}".`;
 });
 
-laserNewButton.addEventListener("click", buildLaserPuzzle);
+laserDeleteButton.addEventListener("click", () => {
+  const name = laserSavedLevels.value;
+  if (!name) return;
+  const levels = getSavedLaserLevels();
+  delete levels[name];
+  storeSavedLaserLevels(levels);
+  refreshSavedLaserLevels();
+  laserStatus.textContent = `Deleted "${name}".`;
+});
 
-buildLaserPuzzle();
+refreshSavedLaserLevels();
+setLaserMode("setup");
+renderLaserBoard();
+traceLaser();
 
 // ----------------------------
 // PWA service worker / update handling

@@ -1717,3 +1717,34 @@ input[type="range"] {
 .guide-collision .guide-facing-arrow {
   color: #a84840;
 }
+
+/* V9 Laser Lab builder/playground */
+.laser-mode-switch{width:min(100%,430px);margin:0 auto 8px;padding:4px;display:grid;grid-template-columns:1fr 1fr;gap:5px;border-radius:15px;background:rgba(255,255,255,.08)}
+.laser-mode-button{min-height:39px;border:0;border-radius:11px;background:transparent;color:rgba(246,251,255,.64);font-weight:850}
+.laser-mode-button.active{background:rgba(255,255,255,.16);color:#fff}
+.laser-setup-panel,.laser-play-panel{width:min(100%,430px);margin:0 auto 8px}
+.laser-size-row{display:grid;grid-template-columns:auto repeat(3,1fr);gap:5px;align-items:center;margin-bottom:7px}
+.laser-size-row>span{font-size:10px;font-weight:900;letter-spacing:.08em;color:rgba(246,251,255,.48)}
+.laser-size-button{min-height:34px;border:0;border-radius:10px;background:rgba(255,255,255,.06);color:rgba(246,251,255,.65);font-size:10px;font-weight:850}
+.laser-size-button.active{background:rgba(76,191,255,.18);color:#fff}
+.laser-tools{display:grid;grid-template-columns:repeat(6,1fr);gap:5px}
+.play-tools{grid-template-columns:1fr 1fr 1.4fr}
+.laser-tool{min-width:0;min-height:48px;border:1px solid rgba(255,255,255,.07);border-radius:12px;background:rgba(255,255,255,.055);color:rgba(246,251,255,.65);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:8px;font-weight:800}
+.laser-tool.active{background:rgba(76,191,255,.17);border-color:rgba(76,191,255,.34);color:#fff}
+.laser-tool-icon{font-size:19px;line-height:18px}
+.laser-help{margin-top:6px;min-height:26px;padding:5px 8px;border-radius:10px;background:rgba(255,255,255,.04);color:rgba(246,251,255,.46);font-size:9px;line-height:1.35;text-align:center}
+.laser-save-row{margin-top:7px;display:grid;grid-template-columns:1.4fr .65fr 1.25fr .65fr .65fr;gap:5px}
+.laser-save-row input,.laser-save-row select{min-width:0;min-height:36px;border:1px solid rgba(255,255,255,.09);border-radius:10px;background:rgba(255,255,255,.07);color:#fff;padding:0 8px;font-size:10px}
+.laser-save-row input::placeholder{color:rgba(246,251,255,.35)}
+.laser-save-row select option{color:#111}
+.laser-save-button{min-height:36px;border:0;border-radius:10px;background:rgba(255,255,255,.11);color:rgba(246,251,255,.78);font-size:9px;font-weight:850}
+.laser-save-button.danger{color:#ffaaa3}
+.laser-board{grid-template-columns:repeat(var(--laser-cols,10),1fr)!important;grid-template-rows:repeat(var(--laser-rows,14),1fr)!important;aspect-ratio:var(--laser-cols,10)/var(--laser-rows,14)!important}
+.laser-splitter{position:relative;width:84%;height:84%;z-index:6}
+.laser-splitter::before,.laser-splitter::after{content:"";position:absolute;left:8%;right:8%;top:47%;height:7%;border-radius:999px;transform-origin:center}
+.laser-splitter::before{background:linear-gradient(90deg,#cbb8ff,#fff,#cbb8ff);box-shadow:0 0 8px rgba(203,184,255,.32)}
+.laser-splitter::after{left:42%;right:auto;width:16%;background:#bda7ff;transform:rotate(90deg)}
+.laser-splitter.angle-0::before{transform:rotate(0deg)}.laser-splitter.angle-1::before{transform:rotate(22.5deg)}.laser-splitter.angle-2::before{transform:rotate(45deg)}.laser-splitter.angle-3::before{transform:rotate(67.5deg)}.laser-splitter.angle-4::before{transform:rotate(90deg)}.laser-splitter.angle-5::before{transform:rotate(112.5deg)}.laser-splitter.angle-6::before{transform:rotate(135deg)}.laser-splitter.angle-7::before{transform:rotate(157.5deg)}
+.laser-emitter.dir-0{transform:rotate(0deg)}.laser-emitter.dir-1{transform:rotate(45deg)}.laser-emitter.dir-2{transform:rotate(90deg)}.laser-emitter.dir-3{transform:rotate(135deg)}.laser-emitter.dir-4{transform:rotate(180deg)}.laser-emitter.dir-5{transform:rotate(225deg)}.laser-emitter.dir-6{transform:rotate(270deg)}.laser-emitter.dir-7{transform:rotate(315deg)}
+.laser-beam-line.branch-1{stroke:rgba(255,88,88,.96)}.laser-beam-line.branch-2{stroke:rgba(255,153,90,.94)}.laser-beam-line.branch-3{stroke:rgba(255,213,97,.94)}.laser-beam-line.branch-4{stroke:rgba(112,220,255,.94)}
+.laser-info-row{grid-template-columns:repeat(3,1fr)}
