@@ -1452,9 +1452,9 @@ const laserDirVectors = [
 ];
 
 const laserLevelInfo = {
-  easy:   { minMirrors: 2, maxMirrors: 3, checkpoints: 1, extraOpen: 24, minRoute: 10 },
-  medium: { minMirrors: 3, maxMirrors: 5, checkpoints: 1, extraOpen: 14, minRoute: 14 },
-  hard:   { minMirrors: 5, maxMirrors: 7, checkpoints: 2, extraOpen: 6, minRoute: 18 }
+  easy:   { minMirrors: 3, maxMirrors: 4, checkpoints: 1, extraOpen: 20, minRoute: 14 },
+  medium: { minMirrors: 5, maxMirrors: 7, checkpoints: 2, extraOpen: 10, minRoute: 20 },
+  hard:   { minMirrors: 7, maxMirrors: 9, checkpoints: 3, extraOpen: 4, minRoute: 26 }
 };
 
 let laserLevel = localStorage.getItem("laserLevel") || "easy";
@@ -1474,8 +1474,9 @@ function laserInBounds(row, col) {
 }
 
 function laserDirAngle(dir) {
-  // Convert our clockwise-from-north index into mathematical degrees from +x.
-  return (90 - dir * 45 + 360) % 360;
+  // Screen-space angle: 0° = right and 90° = down.
+  // Direction index 0 starts at north and turns clockwise.
+  return (dir * 45 - 90 + 360) % 360;
 }
 
 function mirrorLineAngle(orientation) {
@@ -1491,9 +1492,9 @@ function normalizeAngle(angle) {
 }
 
 function angleToLaserDir(angle) {
-  // Snap to nearest 45-degree direction.
+  // Convert screen-space angle back to our clockwise-from-north direction index.
   const normalized = normalizeAngle(angle);
-  const dir = Math.round((90 - normalized) / 45);
+  const dir = Math.round((normalized + 90) / 45);
   return ((dir % 8) + 8) % 8;
 }
 
@@ -1556,9 +1557,9 @@ function shuffledDirections() {
 function buildSegmentedLaserCandidate(level) {
   const info = laserLevelInfo[level];
   const desiredMirrors =
-    level === "easy" ? randomInt(2, 3) :
-    level === "medium" ? randomInt(3, 5) :
-    randomInt(5, 7);
+    level === "easy" ? randomInt(3, 4) :
+    level === "medium" ? randomInt(5, 7) :
+    randomInt(7, 9);
 
   for (let attempt = 0; attempt < 450; attempt++) {
     const emitter = randomLaserEmitter();
@@ -1575,7 +1576,10 @@ function buildSegmentedLaserCandidate(level) {
       const [dr, dc] = laserDirVectors[dir];
 
       // Travel a short straight section before each mirror.
-      const possibleLengths = [2, 3, 4].sort(() => Math.random() - .5);
+      const possibleLengths =
+        level === "easy"
+          ? [2, 3, 4].sort(() => Math.random() - .5)
+          : [3, 4, 5].sort(() => Math.random() - .5);
       let corner = null;
 
       for (const length of possibleLengths) {
@@ -1699,11 +1703,20 @@ function buildSegmentedLaserCandidate(level) {
     const routeKeys = new Set(route.map(cell => laserKey(cell.row, cell.col)));
     const mirrorKeys = new Set(mirrorCells.map(m => laserKey(m.row, m.col)));
 
-    const checkpointCandidates = route.filter((cell, index) =>
-      index > 2 &&
-      index < route.length - 2 &&
-      !mirrorKeys.has(laserKey(cell.row, cell.col))
-    );
+    const checkpointCandidates = route.filter((cell, index) => {
+      if (index <= 2 || index >= route.length - 2) return false;
+
+      const key = laserKey(cell.row, cell.col);
+      if (mirrorKeys.has(key)) return false;
+
+      const prev = route[index - 1];
+      const next = route[index + 1];
+      const inDir = laserDirectionBetween(prev, cell);
+      const outDir = laserDirectionBetween(cell, next);
+
+      // A checkpoint is only placed on a straight section of the intended path.
+      return inDir === outDir;
+    });
 
     if (checkpointCandidates.length < info.checkpoints) continue;
 
@@ -1860,6 +1873,17 @@ function placeLaserPiece(row, col) {
   if (laserPuzzle.obstacles.has(key)) return;
   if (row === laserPuzzle.emitter.row && col === laserPuzzle.emitter.col) return;
   if (row === laserPuzzle.target.row && col === laserPuzzle.target.col) return;
+
+  const isCheckpoint = laserPuzzle.checkpoints.some(
+    checkpoint => checkpoint.row === row && checkpoint.col === col
+  );
+
+  if (isCheckpoint) {
+    laserStatus.classList.remove("good");
+    laserStatus.classList.add("bad");
+    laserStatus.textContent = "Checkpoints must stay clear so the beam can pass through.";
+    return;
+  }
 
   if (laserSelectedPiece === "eraser") {
     laserPlaced.delete(key);
