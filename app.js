@@ -1067,14 +1067,24 @@ function buildCodingPuzzle() {
   setCodingControlsEnabled(true);
 }
 
-function addGuideMarker(cell, glyph, stepNumber, kind = "") {
+function addGuideMarker(cell, item) {
   const marker = document.createElement("span");
-  marker.className = `guide-marker ${kind}`.trim();
-  marker.textContent = glyph;
+  marker.className = `guide-marker ${item.kind || ""}`.trim();
+
+  const dot = document.createElement("span");
+  dot.className = item.kind === "guide-turn"
+    ? "guide-move-dot guide-turn-dot"
+    : "guide-move-dot";
+  marker.appendChild(dot);
+
+  const arrow = document.createElement("span");
+  arrow.className = `guide-facing-arrow dir-${item.dir}`;
+  arrow.textContent = item.collision ? "×" : "➤";
+  marker.appendChild(arrow);
 
   const number = document.createElement("span");
   number.className = "guide-step-number";
-  number.textContent = stepNumber;
+  number.textContent = item.step;
   marker.appendChild(number);
 
   cell.appendChild(marker);
@@ -1091,45 +1101,45 @@ function simulateCodingGuide() {
   codingProgram.forEach((command, index) => {
     if (preview.some(item => item.collision)) return;
 
-    const before = { ...state };
     const next = nextCodingState(state, command);
 
     if (command === "left" || command === "right") {
+      state = { row: next.row, col: next.col, dir: next.dir };
+
       preview.push({
-        row: before.row,
-        col: before.col,
-        glyph: command === "left" ? "↶" : "↷",
+        row: state.row,
+        col: state.col,
+        dir: state.dir,
         step: index + 1,
         kind: "guide-turn",
         collision: false
       });
-    } else if (next.collision) {
-      const [dr, dc] = directionVectors[before.dir];
-      const sign = command === "back" ? -1 : 1;
+
+      return;
+    }
+
+    if (next.collision) {
       preview.push({
-        row: before.row,
-        col: before.col,
-        glyph: "×",
+        row: state.row,
+        col: state.col,
+        dir: state.dir,
         step: index + 1,
         kind: "guide-collision",
         collision: true
       });
-    } else {
-      const dr = next.row - before.row;
-      const dc = next.col - before.col;
-      preview.push({
-        row: next.row,
-        col: next.col,
-        glyph: absoluteMoveGlyph[`${dr},${dc}`] || "•",
-        step: index + 1,
-        kind: "",
-        collision: false
-      });
+      return;
     }
 
-    if (!next.collision) {
-      state = { row: next.row, col: next.col, dir: next.dir };
-    }
+    state = { row: next.row, col: next.col, dir: next.dir };
+
+    preview.push({
+      row: state.row,
+      col: state.col,
+      dir: state.dir,
+      step: index + 1,
+      kind: "",
+      collision: false
+    });
   });
 
   return preview;
@@ -1167,18 +1177,22 @@ function renderCodingBoard() {
         cell.appendChild(flag);
       }
 
-      guide
-        .filter(item => item.row === row && item.col === col)
-        .forEach((item, markerIndex) => {
-          const wrapper = document.createElement("span");
-          wrapper.style.position = "absolute";
-          wrapper.style.inset = "0";
-          wrapper.style.display = "grid";
-          wrapper.style.placeItems = "center";
-          wrapper.style.transform = `translate(${(markerIndex % 2) * 15 - 7}%, ${Math.floor(markerIndex / 2) * 15 - 7}%)`;
-          addGuideMarker(wrapper, item.glyph, item.step, item.kind);
-          cell.appendChild(wrapper);
-        });
+      const guideItems = guide.filter(item => item.row === row && item.col === col);
+
+      guideItems.forEach((item, markerIndex) => {
+        const wrapper = document.createElement("span");
+        wrapper.style.position = "absolute";
+        wrapper.style.inset = "0";
+        wrapper.style.zIndex = String(2 + markerIndex);
+
+        // If several commands happen in one square, offset each guide slightly
+        // so the centre dots remain readable while the facing arrow stays at the edge.
+        const offset = (markerIndex - (guideItems.length - 1) / 2) * 10;
+        wrapper.style.transform = `translate(${offset}%, ${offset}%)`;
+
+        addGuideMarker(wrapper, item);
+        cell.appendChild(wrapper);
+      });
 
       if (row === codingPuzzle.state.row && col === codingPuzzle.state.col) {
         const rover = document.createElement("span");

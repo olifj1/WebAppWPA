@@ -1641,3 +1641,79 @@ input[type="range"] {
     font-size: 8px;
   }
 }
+
+
+/* V8.3: clearer Coding learning guide */
+.guide-marker {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.guide-move-dot {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 28%;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: rgba(54,105,140,.22);
+  border: 2px solid rgba(54,105,140,.58);
+  box-shadow: 0 1px 4px rgba(40,60,75,.12);
+}
+
+.guide-turn-dot {
+  background: rgba(139,95,161,.18);
+  border-color: rgba(116,77,137,.52);
+}
+
+.guide-facing-arrow {
+  position: absolute;
+  width: 34%;
+  height: 34%;
+  display: grid;
+  place-items: center;
+  color: #2e6486;
+  font-size: clamp(11px, 2.8vw, 16px);
+  font-weight: 900;
+  line-height: 1;
+  text-shadow: 0 1px 2px rgba(255,255,255,.55);
+}
+
+.guide-facing-arrow.dir-0 { left: 50%; top: 2%; transform: translateX(-50%); }
+.guide-facing-arrow.dir-1 { right: 2%; top: 2%; }
+.guide-facing-arrow.dir-2 { right: 2%; top: 50%; transform: translateY(-50%); }
+.guide-facing-arrow.dir-3 { right: 2%; bottom: 2%; }
+.guide-facing-arrow.dir-4 { left: 50%; bottom: 2%; transform: translateX(-50%); }
+.guide-facing-arrow.dir-5 { left: 2%; bottom: 2%; }
+.guide-facing-arrow.dir-6 { left: 2%; top: 50%; transform: translateY(-50%); }
+.guide-facing-arrow.dir-7 { left: 2%; top: 2%; }
+
+.guide-step-number {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: rgba(255,255,255,.94);
+  color: #344955;
+  font-size: 7px;
+  font-weight: 900;
+  box-shadow: 0 1px 4px rgba(30,45,55,.12);
+}
+
+.guide-collision .guide-move-dot {
+  background: rgba(195,76,67,.17);
+  border-color: rgba(168,72,64,.55);
+}
+
+.guide-collision .guide-facing-arrow {
+  color: #a84840;
+}
