@@ -1078,7 +1078,9 @@ function addGuideMarker(cell, item) {
   }
 
   const arrow = document.createElement("span");
-  arrow.className = `guide-simple-arrow dir-${item.finalDir}`;
+  const guideDir = ((item.finalDir % 4) + 4) % 4;
+  const guideDirClass = ["dir-0", "dir-2", "dir-4", "dir-6"][guideDir];
+  arrow.className = `guide-simple-arrow ${guideDirClass}`;
   arrow.textContent = item.collision ? "×" : "➤";
   if (item.collision) arrow.classList.add("collision");
   marker.appendChild(arrow);
