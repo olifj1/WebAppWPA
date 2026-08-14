@@ -1551,149 +1551,188 @@ function shuffledDirections() {
 }
 
 // Create a self-avoiding 8-direction route from emitter to target.
-function makeLaserRoute(emitter, target, minCells) {
-  const path = [{ row: emitter.row, col: emitter.col }];
-  const visited = new Set([laserKey(emitter.row, emitter.col)]);
+function buildSegmentedLaserCandidate(level) {
+  const info = laserLevelInfo[level];
+  const desiredMirrors =
+    level === "easy" ? randomInt(2, 3) :
+    level === "medium" ? randomInt(3, 5) :
+    randomInt(5, 7);
 
-  function dfs(row, col, lastDir, depth) {
-    if (
-      row === target.row &&
-      col === target.col &&
-      path.length >= minCells
-    ) {
-      return true;
-    }
+  for (let attempt = 0; attempt < 450; attempt++) {
+    const emitter = randomLaserEmitter();
+    let row = emitter.row;
+    let col = emitter.col;
+    let dir = emitter.dir;
 
-    if (depth > 48) return false;
+    const route = [{ row, col }];
+    const visited = new Set([laserKey(row, col)]);
+    const mirrorCells = [];
+    let failed = false;
 
-    let dirs = shuffledDirections();
-
-    // Slight bias toward the target, but not too much.
-    dirs.sort((a, b) => {
-      const [adr, adc] = laserDirVectors[a];
-      const [bdr, bdc] = laserDirVectors[b];
-
-      const ad = Math.abs(target.row - (row + adr)) + Math.abs(target.col - (col + adc));
-      const bd = Math.abs(target.row - (row + bdr)) + Math.abs(target.col - (col + bdc));
-
-      return (ad + Math.random() * 4) - (bd + Math.random() * 4);
-    });
-
-    for (const dir of dirs) {
-      if (lastDir !== null && dir === (lastDir + 4) % 8) continue;
-
+    for (let mirrorIndex = 0; mirrorIndex < desiredMirrors; mirrorIndex++) {
       const [dr, dc] = laserDirVectors[dir];
-      const nr = row + dr;
-      const nc = col + dc;
 
-      if (!laserInBounds(nr, nc)) continue;
+      // Travel a short straight section before each mirror.
+      const possibleLengths = [2, 3, 4].sort(() => Math.random() - .5);
+      let corner = null;
 
-      // Don't touch another edge cell before the target.
-      const isEdge = nr === 0 || nr === LASER_ROWS - 1 || nc === 0 || nc === LASER_COLS - 1;
-      if (isEdge && !(nr === target.row && nc === target.col)) continue;
+      for (const length of possibleLengths) {
+        let tr = row;
+        let tc = col;
+        let valid = true;
+        const segment = [];
 
-      const key = laserKey(nr, nc);
-      if (visited.has(key)) continue;
+        for (let step = 0; step < length; step++) {
+          tr += dr;
+          tc += dc;
 
-      visited.add(key);
-      path.push({ row: nr, col: nc });
+          if (!laserInBounds(tr, tc)) {
+            valid = false;
+            break;
+          }
 
-      if (dfs(nr, nc, dir, depth + 1)) return true;
+          // Mirrors should stay away from the outer edge.
+          if (
+            step === length - 1 &&
+            (tr === 0 || tr === LASER_ROWS - 1 || tc === 0 || tc === LASER_COLS - 1)
+          ) {
+            valid = false;
+            break;
+          }
 
-      path.pop();
-      visited.delete(key);
-    }
+          const key = laserKey(tr, tc);
+          if (visited.has(key)) {
+            valid = false;
+            break;
+          }
 
-    return false;
-  }
+          segment.push({ row: tr, col: tc });
+        }
 
-  return dfs(emitter.row, emitter.col, emitter.dir, 0) ? path : null;
-}
+        if (valid) {
+          corner = { row: tr, col: tc, segment };
+          break;
+        }
+      }
 
-function compressLaserRoute(path, emitterDir) {
-  const mirrorCells = [];
-  let inDir = emitterDir;
+      if (!corner) {
+        failed = true;
+        break;
+      }
 
-  for (let i = 0; i < path.length - 1; i++) {
-    const outDir = laserDirectionBetween(path[i], path[i + 1]);
-    if (outDir < 0) return null;
+      for (const cell of corner.segment) {
+        visited.add(laserKey(cell.row, cell.col));
+        route.push({ ...cell });
+      }
 
-    if (outDir !== inDir) {
-      const orientation = mirrorOrientationForTurn(inDir, outDir);
-      if (orientation === null) return null;
+      row = corner.row;
+      col = corner.col;
 
-      // A mirror is required at the current cell, but not on the emitter cell.
-      if (i === 0) return null;
+      // Pick a new direction that a mirror can create and that has room ahead.
+      const directionChoices = [0,1,2,3,4,5,6,7]
+        .filter(nextDir => {
+          if (nextDir === dir || nextDir === (dir + 4) % 8) return false;
+
+          const orientation = mirrorOrientationForTurn(dir, nextDir);
+          if (orientation === null) return false;
+
+          const [ndr, ndc] = laserDirVectors[nextDir];
+          const nr = row + ndr;
+          const nc = col + ndc;
+
+          if (!laserInBounds(nr, nc)) return false;
+          if (visited.has(laserKey(nr, nc))) return false;
+
+          return true;
+        })
+        .sort(() => Math.random() - .5);
+
+      if (!directionChoices.length) {
+        failed = true;
+        break;
+      }
+
+      const nextDir = directionChoices[0];
+      const orientation = mirrorOrientationForTurn(dir, nextDir);
 
       mirrorCells.push({
-        row: path[i].row,
-        col: path[i].col,
+        row,
+        col,
         orientation
       });
 
-      inDir = outDir;
+      dir = nextDir;
     }
-  }
 
-  return mirrorCells;
-}
+    if (failed) continue;
 
-function buildLaserPuzzle() {
-  const info = laserLevelInfo[laserLevel];
-  laserPlaced = new Map();
-  laserResult.classList.add("hidden");
+    // After the final mirror, extend the beam until it reaches an outer edge.
+    const [fdr, fdc] = laserDirVectors[dir];
+    let target = null;
 
-  let built = null;
+    for (let step = 0; step < 20; step++) {
+      row += fdr;
+      col += fdc;
 
-  for (let attempt = 0; attempt < 700; attempt++) {
-    const emitter = randomLaserEmitter();
-    const target = randomLaserTargetDifferentEdge(emitter);
-    const route = makeLaserRoute(emitter, target, info.minRoute);
+      if (!laserInBounds(row, col)) break;
 
-    if (!route) continue;
+      const key = laserKey(row, col);
+      if (visited.has(key)) {
+        failed = true;
+        break;
+      }
 
-    const mirrorCells = compressLaserRoute(route, emitter.dir);
-    if (!mirrorCells) continue;
+      visited.add(key);
+      route.push({ row, col });
 
-    if (mirrorCells.length < info.minMirrors || mirrorCells.length > info.maxMirrors) continue;
+      if (row === 0 || row === LASER_ROWS - 1 || col === 0 || col === LASER_COLS - 1) {
+        target = { row, col };
+        break;
+      }
+    }
+
+    if (failed || !target) continue;
+    if (route.length < info.minRoute) continue;
 
     const routeKeys = new Set(route.map(cell => laserKey(cell.row, cell.col)));
-
-    // Pick checkpoints from non-mirror route cells.
     const mirrorKeys = new Set(mirrorCells.map(m => laserKey(m.row, m.col)));
-    const candidates = route.filter((cell, index) =>
+
+    const checkpointCandidates = route.filter((cell, index) =>
       index > 2 &&
       index < route.length - 2 &&
       !mirrorKeys.has(laserKey(cell.row, cell.col))
     );
 
-    if (candidates.length < info.checkpoints) continue;
+    if (checkpointCandidates.length < info.checkpoints) continue;
 
-    const shuffled = [...candidates].sort(() => Math.random() - .5);
-    const checkpoints = shuffled.slice(0, info.checkpoints);
+    const checkpoints = [...checkpointCandidates]
+      .sort(() => Math.random() - .5)
+      .slice(0, info.checkpoints);
 
     const obstacles = new Set();
 
-    for (let row = 0; row < LASER_ROWS; row++) {
-      for (let col = 0; col < LASER_COLS; col++) {
-        const key = laserKey(row, col);
+    for (let r = 0; r < LASER_ROWS; r++) {
+      for (let c = 0; c < LASER_COLS; c++) {
+        const key = laserKey(r, c);
         if (!routeKeys.has(key)) obstacles.add(key);
       }
     }
 
-    // Open some extra non-route cells so the puzzle isn't just an obvious corridor.
+    // Open some extra cells so the intended route isn't just an obvious tunnel.
     const obstacleList = [...obstacles].sort(() => Math.random() - .5);
     let opened = 0;
 
     for (const key of obstacleList) {
       if (opened >= info.extraOpen) break;
-      const [row, col] = key.split(",").map(Number);
-      if (row === 0 || row === LASER_ROWS - 1 || col === 0 || col === LASER_COLS - 1) continue;
+
+      const [r, c] = key.split(",").map(Number);
+      if (r === 0 || r === LASER_ROWS - 1 || c === 0 || c === LASER_COLS - 1) continue;
+
       obstacles.delete(key);
       opened += 1;
     }
 
-    built = {
+    return {
       emitter,
       target,
       checkpoints,
@@ -1701,24 +1740,40 @@ function buildLaserPuzzle() {
       solutionMirrors: mirrorCells,
       mirrorLimit: mirrorCells.length
     };
-
-    break;
   }
 
+  return null;
+}
+
+function buildLaserPuzzle() {
+  const info = laserLevelInfo[laserLevel];
+  laserPlaced = new Map();
+  laserResult.classList.add("hidden");
+
+  let built = buildSegmentedLaserCandidate(laserLevel);
+
   if (!built) {
-    // Guaranteed fallback using four mirrors and diagonal travel.
+    // Guaranteed simple fallback that still uses diagonal reflection.
+    const emitter = { row: 9, col: 1, dir: 0 };
+    const target = { row: 0, col: 5 };
+    const checkpoints = [{ row: 5, col: 3 }];
+
+    // Known path:
+    // up -> NE -> up -> NE, then continue to the top edge.
+    const solutionMirrors = [
+      { row: 7, col: 1, orientation: mirrorOrientationForTurn(0, 1) },
+      { row: 5, col: 3, orientation: mirrorOrientationForTurn(1, 0) },
+      { row: 3, col: 3, orientation: mirrorOrientationForTurn(0, 1) }
+    ];
+
+    // Keep fallback mostly open so it is always playable.
     built = {
-      emitter: { row: 9, col: 1, dir: 0 },
-      target: { row: 0, col: 6 },
-      checkpoints: [{ row: 5, col: 4 }],
+      emitter,
+      target,
+      checkpoints,
       obstacles: new Set(),
-      solutionMirrors: [
-        { row: 7, col: 1, orientation: 0 },
-        { row: 5, col: 3, orientation: 2 },
-        { row: 3, col: 5, orientation: 0 },
-        { row: 1, col: 5, orientation: 3 }
-      ],
-      mirrorLimit: 4
+      solutionMirrors,
+      mirrorLimit: 3
     };
   }
 
