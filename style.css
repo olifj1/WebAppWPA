@@ -1571,10 +1571,14 @@ input[type="range"] {
   height: 6%;
 }
 
-.laser-mirror.angle-0::before   { transform: rotate(22.5deg); }
-.laser-mirror.angle-1::before   { transform: rotate(67.5deg); }
-.laser-mirror.angle-2::before   { transform: rotate(112.5deg); }
-.laser-mirror.angle-3::before   { transform: rotate(157.5deg); }
+.laser-mirror.angle-0::before { transform: rotate(0deg); }
+.laser-mirror.angle-1::before { transform: rotate(22.5deg); }
+.laser-mirror.angle-2::before { transform: rotate(45deg); }
+.laser-mirror.angle-3::before { transform: rotate(67.5deg); }
+.laser-mirror.angle-4::before { transform: rotate(90deg); }
+.laser-mirror.angle-5::before { transform: rotate(112.5deg); }
+.laser-mirror.angle-6::before { transform: rotate(135deg); }
+.laser-mirror.angle-7::before { transform: rotate(157.5deg); }
 
 .laser-result {
   width: min(100%, 430px);

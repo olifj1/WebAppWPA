@@ -1,4 +1,4 @@
-const CACHE = "learning-play-v7-2";
+const CACHE = "learning-play-v7-3";
 const APP_SHELL = [
   "./",
   "./index.html",

@@ -1479,7 +1479,9 @@ function laserDirAngle(dir) {
 }
 
 function mirrorLineAngle(orientation) {
-  return 22.5 + orientation * 45;
+  // 8 useful mirror line rotations: 0°, 22.5°, 45° ... 157.5°.
+  // This allows reflections to remain horizontal/vertical OR become diagonal.
+  return orientation * 22.5;
 }
 
 function normalizeAngle(angle) {
@@ -1504,7 +1506,7 @@ function laserReflect(dir, orientation) {
 
 function mirrorOrientationForTurn(inDir, outDir) {
   // Find one of the four mirror orientations that maps inDir to outDir.
-  for (let orientation = 0; orientation < 4; orientation++) {
+  for (let orientation = 0; orientation < 8; orientation++) {
     if (laserReflect(inDir, orientation) === outDir) return orientation;
   }
   return null;
@@ -1863,7 +1865,7 @@ function placeLaserPiece(row, col) {
     laserPlaced.delete(key);
   } else {
     if (laserPlaced.has(key)) {
-      laserPlaced.set(key, (laserPlaced.get(key) + 1) % 4);
+      laserPlaced.set(key, (laserPlaced.get(key) + 1) % 8);
     } else {
       if (laserPlaced.size >= laserPuzzle.mirrorLimit) {
         laserStatus.classList.remove("good");
@@ -1872,7 +1874,9 @@ function placeLaserPiece(row, col) {
         return;
       }
 
-      laserPlaced.set(key, 0);
+      // Start new mirrors at 45°, which turns a straight horizontal/vertical beam
+      // through 90° and keeps it on the grid. Repeated taps then cycle through all 8 angles.
+      laserPlaced.set(key, 2);
     }
   }
 
