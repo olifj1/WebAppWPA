@@ -1521,3 +1521,119 @@ input[type="range"] {
 .laser-status{width:min(100%,430px);min-height:22px;margin:7px auto 5px;text-align:center;font-size:13px;font-weight:750;color:rgba(246,251,255,.68)}.laser-status.good{color:#82eda7}.laser-status.bad{color:#ff9999}.laser-info-row{width:min(100%,430px);margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:7px}.laser-info-pill{min-height:44px;padding:7px 10px;border-radius:14px;background:rgba(255,255,255,.07);display:flex;align-items:center;justify-content:space-between}.laser-info-pill span{font-size:9px;font-weight:900;letter-spacing:.1em;color:rgba(246,251,255,.45)}.laser-info-pill strong{font-size:16px;color:#fff}
 .laser-win-overlay{position:absolute;z-index:10;inset:8px;border-radius:17px;background:rgba(7,16,27,.91);backdrop-filter:blur(7px);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}.laser-win-stars{color:#ffd667;font-size:31px;letter-spacing:.08em}.laser-win-overlay strong{margin-top:6px;font-size:27px;color:#9df0b9}.laser-win-overlay span{margin-top:5px;font-size:13px;color:rgba(246,251,255,.68)}
 @media(max-height:740px){.laser-header{margin-bottom:4px}.laser-topbar,.laser-pieces{margin-bottom:4px}.laser-board-wrap{width:min(73vw,326px)}.laser-piece{min-height:38px}.laser-status{margin-top:4px}}
+
+
+/* V7: larger Laser Lab grid + 8-direction mirrors */
+.laser-pieces {
+  grid-template-columns: 1fr 1fr 1.4fr;
+  align-items: stretch;
+}
+
+.laser-piece-hint {
+  min-height: 48px;
+  padding: 6px 8px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  background: rgba(255,255,255,.045);
+  color: rgba(246,251,255,.48);
+  font-size: 9px;
+  line-height: 1.25;
+  font-weight: 750;
+}
+
+.mirror-tool-icon {
+  transform: rotate(0deg);
+}
+
+.laser-board {
+  aspect-ratio: 8 / 10;
+  grid-template-columns: repeat(8, 1fr);
+  grid-template-rows: repeat(10, 1fr);
+  gap: 2px;
+  padding: 2px;
+}
+
+.laser-cell {
+  border-radius: 4px;
+}
+
+.laser-mirror {
+  width: 88%;
+  height: 88%;
+}
+
+.laser-mirror::before {
+  left: 4%;
+  right: 4%;
+  top: 47%;
+  height: 6%;
+}
+
+.laser-mirror.angle-0::before   { transform: rotate(22.5deg); }
+.laser-mirror.angle-1::before   { transform: rotate(67.5deg); }
+.laser-mirror.angle-2::before   { transform: rotate(112.5deg); }
+.laser-mirror.angle-3::before   { transform: rotate(157.5deg); }
+
+.laser-result {
+  width: min(100%, 430px);
+  min-height: 42px;
+  margin: 6px auto 0;
+  padding: 7px 10px;
+  border-radius: 14px;
+  background: rgba(95,235,143,.10);
+  border: 1px solid rgba(95,235,143,.18);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 7px;
+  text-align: center;
+}
+
+.laser-result-stars {
+  color: #ffd667;
+  letter-spacing: .05em;
+  font-size: 17px;
+}
+
+.laser-result strong {
+  color: #9df0b9;
+  font-size: 14px;
+}
+
+.laser-result > span:last-child {
+  width: 100%;
+  margin-top: -3px;
+  color: rgba(246,251,255,.56);
+  font-size: 10px;
+}
+
+.laser-target {
+  width: 68%;
+  height: 68%;
+  border-width: 3px;
+}
+
+.laser-checkpoint {
+  width: 52%;
+  height: 52%;
+  border-width: 2px;
+}
+
+.laser-emitter {
+  width: 74%;
+  height: 74%;
+}
+
+@media (max-height: 740px) {
+  .laser-board-wrap {
+    width: min(68vw, 300px);
+  }
+
+  .laser-piece-hint {
+    min-height: 40px;
+    font-size: 8px;
+  }
+}

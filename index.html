@@ -296,19 +296,24 @@
             <button class="laser-new" id="laser-new">New</button>
           </div>
           <div class="laser-pieces">
-            <button class="laser-piece active" data-laser-piece="slash"><span class="piece-icon">/</span><span>Mirror</span></button>
-            <button class="laser-piece" data-laser-piece="backslash"><span class="piece-icon">\</span><span>Mirror</span></button>
-            <button class="laser-piece" data-laser-piece="erase"><span class="piece-icon">⌫</span><span>Erase</span></button>
+            <button class="laser-piece active" data-laser-piece="mirror">
+              <span class="piece-icon mirror-tool-icon">╱</span>
+              <span>Mirror</span>
+            </button>
+            <button class="laser-piece" data-laser-piece="eraser">
+              <span class="piece-icon">⌫</span>
+              <span>Erase</span>
+            </button>
+            <div class="laser-piece-hint">
+              Tap a mirror again to rotate it
+            </div>
           </div>
+
           <div class="laser-board-wrap">
             <div class="laser-board" id="laser-board"></div>
             <svg class="laser-beam-layer" id="laser-beam-layer" viewBox="0 0 600 700" preserveAspectRatio="none"></svg>
-            <div class="laser-win-overlay hidden" id="laser-win-overlay">
-              <div class="laser-win-stars" id="laser-win-stars">★★★</div>
-              <strong>Target hit!</strong>
-              <span id="laser-win-text">Great reflecting!</span>
-            </div>
           </div>
+
           <div class="laser-status" id="laser-status">Place mirrors and watch the beam update.</div>
           <div class="laser-info-row">
             <div class="laser-info-pill"><span>MIRRORS</span><strong id="laser-mirror-count">0 / 3</strong></div>
