@@ -1453,8 +1453,8 @@ const laserDirVectors = [
 
 const laserLevelInfo = {
   easy:   { minMirrors: 3, maxMirrors: 4, checkpoints: 1, extraOpen: 20, minRoute: 14 },
-  medium: { minMirrors: 5, maxMirrors: 7, checkpoints: 2, extraOpen: 10, minRoute: 20 },
-  hard:   { minMirrors: 7, maxMirrors: 9, checkpoints: 3, extraOpen: 4, minRoute: 26 }
+  medium: { minMirrors: 4, maxMirrors: 6, checkpoints: 2, extraOpen: 12, minRoute: 18 },
+  hard:   { minMirrors: 5, maxMirrors: 7, checkpoints: 2, extraOpen: 6, minRoute: 22 }
 };
 
 let laserLevel = localStorage.getItem("laserLevel") || "easy";
@@ -1558,10 +1558,10 @@ function buildSegmentedLaserCandidate(level) {
   const info = laserLevelInfo[level];
   const desiredMirrors =
     level === "easy" ? randomInt(3, 4) :
-    level === "medium" ? randomInt(5, 7) :
-    randomInt(7, 9);
+    level === "medium" ? randomInt(4, 6) :
+    randomInt(5, 7);
 
-  for (let attempt = 0; attempt < 450; attempt++) {
+  for (let attempt = 0; attempt < 1200; attempt++) {
     const emitter = randomLaserEmitter();
     let row = emitter.row;
     let col = emitter.col;
@@ -1579,7 +1579,7 @@ function buildSegmentedLaserCandidate(level) {
       const possibleLengths =
         level === "easy"
           ? [2, 3, 4].sort(() => Math.random() - .5)
-          : [3, 4, 5].sort(() => Math.random() - .5);
+          : [2, 3, 4, 5].sort(() => Math.random() - .5);
       let corner = null;
 
       for (const length of possibleLengths) {
@@ -1768,28 +1768,71 @@ function buildLaserPuzzle() {
   let built = buildSegmentedLaserCandidate(laserLevel);
 
   if (!built) {
-    // Guaranteed simple fallback that still uses diagonal reflection.
-    const emitter = { row: 9, col: 1, dir: 0 };
-    const target = { row: 0, col: 5 };
-    const checkpoints = [{ row: 5, col: 3 }];
-
-    // Known path:
-    // up -> NE -> up -> NE, then continue to the top edge.
-    const solutionMirrors = [
-      { row: 7, col: 1, orientation: mirrorOrientationForTurn(0, 1) },
-      { row: 5, col: 3, orientation: mirrorOrientationForTurn(1, 0) },
-      { row: 3, col: 3, orientation: mirrorOrientationForTurn(0, 1) }
-    ];
-
-    // Keep fallback mostly open so it is always playable.
-    built = {
-      emitter,
-      target,
-      checkpoints,
-      obstacles: new Set(),
-      solutionMirrors,
-      mirrorLimit: 3
-    };
+    // Level-specific guaranteed layouts, used only if random generation fails.
+    if (laserLevel === "easy") {
+      const emitter = { row: 9, col: 1, dir: 0 };
+      const target = { row: 0, col: 5 };
+      const checkpoints = [{ row: 5, col: 3 }];
+      const solutionMirrors = [
+        { row: 7, col: 1, orientation: mirrorOrientationForTurn(0, 1) },
+        { row: 5, col: 3, orientation: mirrorOrientationForTurn(1, 0) },
+        { row: 3, col: 3, orientation: mirrorOrientationForTurn(0, 1) }
+      ];
+      built = {
+        emitter,
+        target,
+        checkpoints,
+        obstacles: new Set(["8,4","7,5","6,5","5,5","4,1","3,1","2,1"]),
+        solutionMirrors,
+        mirrorLimit: 3
+      };
+    } else if (laserLevel === "medium") {
+      const emitter = { row: 9, col: 0, dir: 2 };
+      const target = { row: 0, col: 7 };
+      const checkpoints = [{ row: 7, col: 3 }, { row: 3, col: 5 }];
+      const solutionMirrors = [
+        { row: 9, col: 2, orientation: mirrorOrientationForTurn(2, 1) },
+        { row: 7, col: 4, orientation: mirrorOrientationForTurn(1, 0) },
+        { row: 4, col: 4, orientation: mirrorOrientationForTurn(0, 1) },
+        { row: 2, col: 6, orientation: mirrorOrientationForTurn(1, 0) },
+        { row: 0, col: 6, orientation: mirrorOrientationForTurn(0, 2) }
+      ];
+      built = {
+        emitter,
+        target,
+        checkpoints,
+        obstacles: new Set([
+          "8,1","8,2","8,6","7,6","6,0","6,1","6,5","5,1","5,5",
+          "4,0","4,1","4,6","3,1","3,2","3,6","2,1","1,2","1,5"
+        ]),
+        solutionMirrors,
+        mirrorLimit: 5
+      };
+    } else {
+      const emitter = { row: 9, col: 1, dir: 0 };
+      const target = { row: 0, col: 6 };
+      const checkpoints = [{ row: 7, col: 3 }, { row: 3, col: 4 }];
+      const solutionMirrors = [
+        { row: 7, col: 1, orientation: mirrorOrientationForTurn(0, 1) },
+        { row: 5, col: 3, orientation: mirrorOrientationForTurn(1, 2) },
+        { row: 5, col: 6, orientation: mirrorOrientationForTurn(2, 7) },
+        { row: 3, col: 4, orientation: mirrorOrientationForTurn(7, 0) },
+        { row: 1, col: 4, orientation: mirrorOrientationForTurn(0, 1) },
+        { row: 0, col: 5, orientation: mirrorOrientationForTurn(1, 2) }
+      ];
+      built = {
+        emitter,
+        target,
+        checkpoints,
+        obstacles: new Set([
+          "8,0","8,4","8,5","7,5","6,0","6,4","6,5","5,0","5,1",
+          "4,0","4,2","4,3","4,6","4,7","3,0","3,1","3,6","2,1",
+          "2,2","2,6","1,1","1,2","1,6"
+        ]),
+        solutionMirrors,
+        mirrorLimit: 6
+      };
+    }
   }
 
   laserPuzzle = built;
