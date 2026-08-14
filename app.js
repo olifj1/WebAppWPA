@@ -1419,6 +1419,66 @@ codingLevelButtons.forEach(button => {
 
 buildCodingPuzzle();
 
+
+// ----------------------------
+// Laser Lab
+// ----------------------------
+const laserBoard=$("#laser-board"),laserBeamLayer=$("#laser-beam-layer"),laserStatus=$("#laser-status");
+const laserLevelButtons=$$("[data-laser-level]"),laserPieceButtons=$$("[data-laser-piece]");
+const laserNewButton=$("#laser-new"),laserMirrorCount=$("#laser-mirror-count"),laserCheckpointCount=$("#laser-checkpoint-count");
+const laserWinOverlay=$("#laser-win-overlay"),laserWinStars=$("#laser-win-stars"),laserWinText=$("#laser-win-text");
+const LR=7,LC=6,LD={right:[0,1],down:[1,0],left:[0,-1],up:[-1,0]};
+let laserLevel=localStorage.getItem("laserLevel")||"easy",laserPiece="slash",laserPuzzle=null,laserPlaced=new Map();
+const laserTemplates={
+ easy:[
+  [[6,0],[6,2],[3,2],[3,5]],
+  [[6,5],[6,3],[2,3],[2,0]],
+  [[0,0],[0,2],[4,2],[4,5]]
+ ],
+ medium:[
+  [[6,0],[6,2],[4,2],[4,5],[1,5],[1,3]],
+  [[6,5],[6,3],[3,3],[3,0],[1,0],[1,2]],
+  [[0,5],[2,5],[2,2],[5,2],[5,4],[6,4]]
+ ],
+ hard:[
+  [[6,0],[6,2],[4,2],[4,5],[2,5],[2,1],[0,1]],
+  [[6,5],[6,3],[5,3],[5,0],[2,0],[2,4],[0,4]],
+  [[0,0],[2,0],[2,3],[5,3],[5,1],[6,1],[6,5]]
+ ]
+};
+function lk(r,c){return `${r},${c}`}
+function inL(r,c){return r>=0&&r<LR&&c>=0&&c<LC}
+function ldir(a,b){if(b[0]<a[0])return"up";if(b[0]>a[0])return"down";if(b[1]<a[1])return"left";return"right"}
+function refl(d,m){const s={right:"up",up:"right",left:"down",down:"left"},b={right:"down",down:"right",left:"up",up:"left"};return(m==="slash"?s:b)[d]}
+function mirrorFor(a,b){return ["slash","backslash"].find(m=>refl(a,m)===b)}
+function segmentCells(a,b){const out=[];let r=a[0],c=a[1],d=ldir(a,b),[dr,dc]=LD[d];while(r!==b[0]||c!==b[1]){r+=dr;c+=dc;out.push([r,c])}return out}
+function buildLaser(){
+ const choices=laserTemplates[laserLevel],wps=choices[randomInt(0,choices.length-1)].map(p=>[...p]);
+ const route=[wps[0]];for(let i=0;i<wps.length-1;i++)route.push(...segmentCells(wps[i],wps[i+1]));
+ const routeSet=new Set(route.map(p=>lk(...p))), mirrors=[];
+ for(let i=1;i<wps.length-1;i++){const inD=ldir(wps[i-1],wps[i]),outD=ldir(wps[i],wps[i+1]);mirrors.push({row:wps[i][0],col:wps[i][1],type:mirrorFor(inD,outD)})}
+ const emitter={row:wps[0][0],col:wps[0][1],dir:ldir(wps[0],wps[1])},target={row:wps.at(-1)[0],col:wps.at(-1)[1]};
+ const straight=route.filter(p=>!mirrors.some(m=>m.row===p[0]&&m.col===p[1])&&lk(...p)!==lk(emitter.row,emitter.col)&&lk(...p)!==lk(target.row,target.col));
+ const cpCount=laserLevel==="hard"?2:1,checkpoints=[];for(const p of [...straight].sort(()=>Math.random()-.5)){if(checkpoints.length>=cpCount)break;if(checkpoints.every(q=>Math.abs(q.row-p[0])+Math.abs(q.col-p[1])>1))checkpoints.push({row:p[0],col:p[1]})}
+ const obstacles=new Set();for(let r=0;r<LR;r++)for(let c=0;c<LC;c++)if(!routeSet.has(lk(r,c)))obstacles.add(lk(r,c));
+ const extras=laserLevel==="easy"?12:laserLevel==="medium"?7:3;let opened=0;for(const k of [...obstacles].sort(()=>Math.random()-.5)){if(opened>=extras)break;const [r,c]=k.split(',').map(Number);if(r===0||r===LR-1||c===0||c===LC-1)continue;obstacles.delete(k);opened++}
+ laserPuzzle={emitter,target,checkpoints,obstacles,solutionMirrors:mirrors,mirrorLimit:mirrors.length+1};laserPlaced=new Map();laserWinOverlay.classList.add("hidden");renderLaser();traceLaser();
+}
+function renderLaser(){laserBoard.innerHTML="";for(let r=0;r<LR;r++)for(let c=0;c<LC;c++){const k=lk(r,c),cell=document.createElement("button");cell.type="button";cell.className="laser-cell";if(laserPuzzle.obstacles.has(k)){cell.classList.add("obstacle");cell.disabled=true}
+ const emit=r===laserPuzzle.emitter.row&&c===laserPuzzle.emitter.col,targ=r===laserPuzzle.target.row&&c===laserPuzzle.target.col,cp=laserPuzzle.checkpoints.some(x=>x.row===r&&x.col===c);
+ if(emit){cell.classList.add("emitter-cell");const x=document.createElement("span");x.className=`laser-emitter ${laserPuzzle.emitter.dir}`;cell.appendChild(x);cell.disabled=true}
+ if(targ){cell.classList.add("target-cell");const x=document.createElement("span");x.className="laser-target";x.id="laser-target-indicator";cell.appendChild(x);cell.disabled=true}
+ if(cp){cell.classList.add("checkpoint-cell");const x=document.createElement("span");x.className="laser-checkpoint";x.dataset.cp=k;cell.appendChild(x)}
+ if(laserPlaced.has(k)){const x=document.createElement("span");x.className=`laser-mirror ${laserPlaced.get(k)}`;cell.appendChild(x)}
+ if(!cell.disabled)cell.addEventListener("click",()=>placeMirror(r,c));laserBoard.appendChild(cell)}}
+function placeMirror(r,c){const k=lk(r,c);if(laserPiece==="erase")laserPlaced.delete(k);else{if(!laserPlaced.has(k)&&laserPlaced.size>=laserPuzzle.mirrorLimit){laserStatus.className="laser-status bad";laserStatus.textContent="No mirrors left — erase one first.";return}if(laserPlaced.get(k)===laserPiece)laserPlaced.set(k,laserPiece==="slash"?"backslash":"slash");else laserPlaced.set(k,laserPiece)}laserWinOverlay.classList.add("hidden");renderLaser();traceLaser()}
+function center(r,c){return[(c+.5)*100,(r+.5)*100]}
+function traceLaser(){laserBeamLayer.innerHTML="";let {row,col,dir}=laserPuzzle.emitter,pts=[center(row,col)],hit=new Set(),targetHit=false,seen=new Set();for(let n=0;n<90;n++){const state=`${row},${col},${dir}`;if(seen.has(state))break;seen.add(state);const[dr,dc]=LD[dir],nr=row+dr,nc=col+dc;if(!inL(nr,nc)||laserPuzzle.obstacles.has(lk(nr,nc))){pts.push([(col+.5+dc*.5)*100,(row+.5+dr*.5)*100]);break}row=nr;col=nc;pts.push(center(row,col));const k=lk(row,col);if(laserPuzzle.checkpoints.some(x=>lk(x.row,x.col)===k))hit.add(k);if(row===laserPuzzle.target.row&&col===laserPuzzle.target.col){targetHit=true;break}if(laserPlaced.has(k))dir=refl(dir,laserPlaced.get(k))}
+ const line=document.createElementNS("http://www.w3.org/2000/svg","polyline");line.setAttribute("class","laser-beam-line");line.setAttribute("points",pts.map(p=>p.join(',')).join(' '));laserBeamLayer.appendChild(line);
+ $$(".laser-checkpoint").forEach(x=>x.classList.toggle("hit",hit.has(x.dataset.cp)));const ti=$("#laser-target-indicator");if(ti)ti.classList.toggle("hit",targetHit);laserMirrorCount.textContent=`${laserPlaced.size} / ${laserPuzzle.mirrorLimit}`;laserCheckpointCount.textContent=`${hit.size} / ${laserPuzzle.checkpoints.length}`;
+ const all=hit.size===laserPuzzle.checkpoints.length;if(targetHit&&all){laserStatus.className="laser-status good";laserStatus.textContent="Perfect — every checkpoint and the target were hit!";const opt=laserPuzzle.solutionMirrors.length,extra=Math.max(0,laserPlaced.size-opt),stars=extra===0?3:extra===1?2:1;laserWinStars.textContent="★".repeat(stars)+"☆".repeat(3-stars);laserWinText.textContent=laserPlaced.size===opt?`Perfect solution — ${opt} mirrors.`:`${laserPlaced.size} mirrors used. Best is ${opt}.`;laserWinOverlay.classList.remove("hidden")}else if(targetHit){laserStatus.className="laser-status bad";laserStatus.textContent="The target was hit, but a checkpoint was missed."}else{laserStatus.className="laser-status";laserStatus.textContent="Place mirrors and watch the beam update."}}
+laserPieceButtons.forEach(b=>b.addEventListener("click",()=>{laserPiece=b.dataset.laserPiece;laserPieceButtons.forEach(x=>x.classList.toggle("active",x===b))}));laserLevelButtons.forEach(b=>b.addEventListener("click",()=>{laserLevel=b.dataset.laserLevel;localStorage.setItem("laserLevel",laserLevel);laserLevelButtons.forEach(x=>x.classList.toggle("active",x.dataset.laserLevel===laserLevel));buildLaser()}));laserLevelButtons.forEach(x=>x.classList.toggle("active",x.dataset.laserLevel===laserLevel));laserNewButton.addEventListener("click",buildLaser);buildLaser();
+
 // ----------------------------
 // PWA service worker / update handling
 // ----------------------------

@@ -279,24 +279,53 @@
         </div>
       </section>
 
+      <!-- LASER LAB -->
+      <section class="screen" id="laser-screen" aria-labelledby="laser-title">
+        <div class="page laser-page">
+          <header class="page-header laser-header">
+            <p class="kicker">LEARNING PLAY</p>
+            <h1 id="laser-title">Laser Lab</h1>
+            <p class="subhead">Place mirrors to bounce the beam through every checkpoint and into the target.</p>
+          </header>
+          <div class="laser-topbar">
+            <div class="laser-levels" role="group" aria-label="Laser difficulty">
+              <button class="laser-level active" data-laser-level="easy">Easy</button>
+              <button class="laser-level" data-laser-level="medium">Medium</button>
+              <button class="laser-level" data-laser-level="hard">Hard</button>
+            </div>
+            <button class="laser-new" id="laser-new">New</button>
+          </div>
+          <div class="laser-pieces">
+            <button class="laser-piece active" data-laser-piece="slash"><span class="piece-icon">/</span><span>Mirror</span></button>
+            <button class="laser-piece" data-laser-piece="backslash"><span class="piece-icon">\</span><span>Mirror</span></button>
+            <button class="laser-piece" data-laser-piece="erase"><span class="piece-icon">⌫</span><span>Erase</span></button>
+          </div>
+          <div class="laser-board-wrap">
+            <div class="laser-board" id="laser-board"></div>
+            <svg class="laser-beam-layer" id="laser-beam-layer" viewBox="0 0 600 700" preserveAspectRatio="none"></svg>
+            <div class="laser-win-overlay hidden" id="laser-win-overlay">
+              <div class="laser-win-stars" id="laser-win-stars">★★★</div>
+              <strong>Target hit!</strong>
+              <span id="laser-win-text">Great reflecting!</span>
+            </div>
+          </div>
+          <div class="laser-status" id="laser-status">Place mirrors and watch the beam update.</div>
+          <div class="laser-info-row">
+            <div class="laser-info-pill"><span>MIRRORS</span><strong id="laser-mirror-count">0 / 3</strong></div>
+            <div class="laser-info-pill"><span>CHECKPOINTS</span><strong id="laser-checkpoint-count">0 / 1</strong></div>
+          </div>
+        </div>
+      </section>
+
     </main>
 
     <nav class="tab-bar" aria-label="Learning activities">
-      <button class="tab active" data-screen="numbers-screen" aria-current="page">
-        <span class="tab-icon">×</span><span>Times</span>
-      </button>
-      <button class="tab" data-screen="clock-screen">
-        <span class="tab-icon clock-icon">◷</span><span>Clock</span>
-      </button>
-      <button class="tab" data-screen="sums-screen">
-        <span class="tab-icon sum-icon">+</span><span>Sums</span>
-      </button>
-      <button class="tab" data-screen="reading-screen">
-        <span class="tab-icon reading-icon">Aa</span><span>Reading</span>
-      </button>
-      <button class="tab" data-screen="coding-screen">
-        <span class="tab-icon coding-icon">&lt;/&gt;</span><span>Coding</span>
-      </button>
+      <button class="tab active" data-screen="numbers-screen" aria-current="page"><span class="tab-icon">×</span><span>Times</span></button>
+      <button class="tab" data-screen="clock-screen"><span class="tab-icon clock-icon">◷</span><span>Clock</span></button>
+      <button class="tab" data-screen="sums-screen"><span class="tab-icon sum-icon">+</span><span>Sums</span></button>
+      <button class="tab" data-screen="reading-screen"><span class="tab-icon reading-icon">Aa</span><span>Reading</span></button>
+      <button class="tab" data-screen="coding-screen"><span class="tab-icon coding-icon">&lt;/&gt;</span><span>Coding</span></button>
+      <button class="tab" data-screen="laser-screen"><span class="tab-icon laser-tab-icon">⌁</span><span>Laser</span></button>
     </nav>
   </div>
 
