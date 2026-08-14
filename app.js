@@ -1537,15 +1537,24 @@ function laserDirectionBetween(a, b) {
 }
 
 function addStraightSegment(route, from, to) {
+  // Move diagonally while both axes still need movement, then finish
+  // along the remaining axis. This always terminates and only uses
+  // the 8 directions the laser understands.
   let row = from.row;
   let col = from.col;
-  const dr = Math.sign(to.row - row);
-  const dc = Math.sign(to.col - col);
+  let guard = 0;
 
-  while (row !== to.row || col !== to.col) {
+  while ((row !== to.row || col !== to.col) && guard++ < 200) {
+    const dr = Math.sign(to.row - row);
+    const dc = Math.sign(to.col - col);
+
     row += dr;
     col += dc;
     route.push({ row, col });
+  }
+
+  if (guard >= 200) {
+    throw new Error("Laser route segment failed to converge.");
   }
 }
 
