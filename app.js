@@ -709,6 +709,7 @@ function setReadingLevel(level) {
 }
 
 function generateReading() {
+  if ("speechSynthesis" in window) window.speechSynthesis.cancel();
   readingFeedback.classList.remove('good','bad');
   wordChoices.innerHTML = '';
 
@@ -766,6 +767,92 @@ newReadingButton.addEventListener('click', generateReading);
 setReadingLevel(readingLevel);
 setReadingMode(readingMode);
 
+
+
+// Reading aloud using the device/browser speech synthesiser.
+const readingSpeakButton = $("#reading-speak");
+const readingSpeakLabel = $("#reading-speak-label");
+const readingSpeedButtons = $$("[data-reading-speed]");
+let readingSpeechRate = Number(localStorage.getItem("readingSpeechRate") || 0.95);
+
+function setReadingSpeechRate(rate) {
+  readingSpeechRate = Number(rate);
+  localStorage.setItem("readingSpeechRate", String(readingSpeechRate));
+  readingSpeedButtons.forEach(button => {
+    button.classList.toggle("active", Number(button.dataset.readingSpeed) === readingSpeechRate);
+  });
+}
+
+function stopReadingSpeech() {
+  if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+  readingSpeakButton.classList.remove("speaking");
+  readingSpeakLabel.textContent = "Read aloud";
+}
+
+function readingTextForSpeech() {
+  if (readingMode === "read") return readingPrompt.textContent.trim();
+  if (!activeReadingTest) return "";
+  return activeReadingTest.sentence.replace("___", " ... ");
+}
+
+function chooseReadingVoice() {
+  if (!("speechSynthesis" in window)) return null;
+  const voices = window.speechSynthesis.getVoices();
+  return voices.find(v => /^en-GB$/i.test(v.lang))
+    || voices.find(v => /^en/i.test(v.lang))
+    || voices[0]
+    || null;
+}
+
+function speakReadingText() {
+  if (!("speechSynthesis" in window) || typeof SpeechSynthesisUtterance === "undefined") {
+    readingFeedback.classList.remove("good");
+    readingFeedback.classList.add("bad");
+    readingFeedback.textContent = "Read aloud is not available on this device.";
+    return;
+  }
+
+  if (window.speechSynthesis.speaking) {
+    stopReadingSpeech();
+    return;
+  }
+
+  const text = readingTextForSpeech();
+  if (!text) return;
+
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.rate = readingSpeechRate;
+  utterance.pitch = 1;
+  utterance.volume = 1;
+
+  const voice = chooseReadingVoice();
+  if (voice) utterance.voice = voice;
+
+  utterance.onstart = () => {
+    readingSpeakButton.classList.add("speaking");
+    readingSpeakLabel.textContent = "Stop";
+  };
+  utterance.onend = stopReadingSpeech;
+  utterance.onerror = stopReadingSpeech;
+
+  window.speechSynthesis.cancel();
+  window.speechSynthesis.speak(utterance);
+}
+
+readingSpeakButton.addEventListener("click", speakReadingText);
+readingSpeedButtons.forEach(button => {
+  button.addEventListener("click", () => {
+    stopReadingSpeech();
+    setReadingSpeechRate(button.dataset.readingSpeed);
+  });
+});
+setReadingSpeechRate(readingSpeechRate);
+
+tabs.forEach(tab => {
+  tab.addEventListener("click", () => {
+    if (tab.dataset.screen !== "reading-screen") stopReadingSpeech();
+  });
+});
 
 // ----------------------------
 // Coding / rover programming

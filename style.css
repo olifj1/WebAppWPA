@@ -1797,3 +1797,15 @@ input[type="range"] {
   color: #a84840;
   font-size: clamp(10px, 2.6vw, 15px);
 }
+
+/* V9.3: Reading speech */
+.reading-speech-controls{width:min(100%,430px);margin:12px auto 0;display:grid;grid-template-columns:1.2fr 1fr;gap:8px}
+.reading-speak-button{min-height:52px;border:0;border-radius:16px;background:rgba(255,255,255,.82);color:#4a3e58;display:flex;align-items:center;justify-content:center;gap:8px;font-size:14px;font-weight:850;box-shadow:0 5px 13px rgba(70,55,85,.08)}
+.reading-speak-button.speaking{background:rgba(102,75,128,.16);color:#5a426d}
+.reading-speaker-icon{font-size:20px;line-height:1}
+.reading-speed-control{min-height:52px;padding:6px 7px;border-radius:16px;background:rgba(255,255,255,.55);display:flex;flex-direction:column;justify-content:center;gap:5px}
+.reading-speed-control>span{text-align:center;font-size:9px;font-weight:850;letter-spacing:.06em;text-transform:uppercase;color:rgba(60,51,72,.48)}
+.reading-speed-buttons{display:grid;grid-template-columns:1fr 1fr;gap:4px}
+.reading-speed-button{min-height:27px;border:0;border-radius:9px;background:rgba(255,255,255,.52);color:rgba(60,51,72,.66);font-size:9px;font-weight:850}
+.reading-speed-button.active{background:rgba(102,75,128,.16);color:#5a426d}
+@media (max-width:360px){.reading-speech-controls{grid-template-columns:1fr}}
