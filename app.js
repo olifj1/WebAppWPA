@@ -951,11 +951,12 @@ const gravityInput = {
 };
 
 const gravityWorld = {
-  gravity: 0.115,
-  thrust: 0.22,
-  rotationSpeed: 0.052,
-  drag: 0.999,
-  maxSpeed: 8.2,
+  // Deliberately gentle, floaty physics for touch play.
+  gravity: 0.045,
+  thrust: 0.095,
+  rotationSpeed: 0.034,
+  drag: 0.996,
+  maxSpeed: 4.2,
   running: true
 };
 
@@ -1066,7 +1067,7 @@ function updateGravity() {
   // Goal pad: success only when arriving gently and roughly upright.
   if (gravityPadLanding(gravityGoalPad)) {
     const upright = Math.abs(Math.sin(rocket.angle)) < 0.42;
-    const gentle = Math.hypot(rocket.vx, rocket.vy) < 2.7;
+    const gentle = Math.hypot(rocket.vx, rocket.vy) < 3.0;
 
     if (upright && gentle) {
       rocket.y = gravityGoalPad.y - rocket.radius;
@@ -1077,7 +1078,7 @@ function updateGravity() {
   }
 
   // Start pad is safe only at the beginning / gentle touch.
-  if (gravityPadLanding(gravityStartPad) && rocket.vy >= 0 && Math.hypot(rocket.vx, rocket.vy) < 2.8) {
+  if (gravityPadLanding(gravityStartPad) && rocket.vy >= 0 && Math.hypot(rocket.vx, rocket.vy) < 3.2) {
     rocket.y = gravityStartPad.y - rocket.radius;
     rocket.vy = Math.min(0, rocket.vy);
   }
