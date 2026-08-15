@@ -1991,3 +1991,21 @@ input[type="range"] {
   .gravity-controls { margin-top: 6px; }
   .gravity-control { min-height: 52px; }
 }
+
+/* V10.2 Gravity tuning */
+.gravity-tuning{
+  width:min(100%,430px);margin:0 auto 7px;display:grid;
+  grid-template-columns:1fr 1fr;gap:7px;
+}
+.gravity-tuning label{
+  padding:7px 9px 8px;border-radius:12px;
+  background:rgba(255,255,255,.07);
+  border:1px solid rgba(255,255,255,.07);
+}
+.gravity-tuning label>span{
+  display:flex;justify-content:space-between;align-items:center;
+  font-size:9px;font-weight:850;letter-spacing:.05em;
+  color:rgba(244,247,251,.62);
+}
+.gravity-tuning label strong{color:#f4f7fb;font-size:10px}
+.gravity-tuning input[type="range"]{width:100%;margin:7px 0 0;touch-action:pan-x}

@@ -940,6 +940,10 @@ const gravityMessageTitle = $("#gravity-message-title");
 const gravityMessageText = $("#gravity-message-text");
 const gravityHeight = $("#gravity-height");
 const gravitySpeed = $("#gravity-speed");
+const gravitySlider = $("#gravity-slider");
+const thrustSlider = $("#thrust-slider");
+const gravityValue = $("#gravity-value");
+const thrustValue = $("#thrust-value");
 
 const GW = gravityCanvas.width;
 const GH = gravityCanvas.height;
@@ -952,13 +956,23 @@ const gravityInput = {
 
 const gravityWorld = {
   // Deliberately gentle, floaty physics for touch play.
-  gravity: 0.045,
-  thrust: 0.095,
+  gravity: 0.025,
+  thrust: 0.060,
   rotationSpeed: 0.034,
   drag: 0.996,
-  maxSpeed: 4.2,
+  maxSpeed: 3.6,
   running: true
 };
+
+function updateGravityTuning() {
+  gravityWorld.gravity = Number(gravitySlider.value);
+  gravityWorld.thrust = Number(thrustSlider.value);
+  gravityValue.textContent = gravityWorld.gravity.toFixed(3);
+  thrustValue.textContent = gravityWorld.thrust.toFixed(3);
+}
+gravitySlider.addEventListener("input", updateGravityTuning);
+thrustSlider.addEventListener("input", updateGravityTuning);
+updateGravityTuning();
 
 // Hand-built cavern. Each rectangle is a solid wall.
 const gravityWalls = [

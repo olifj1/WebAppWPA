@@ -250,6 +250,17 @@
             <button id="gravity-reset" class="gravity-reset">Reset</button>
           </div>
 
+          <div class="gravity-tuning">
+            <label>
+              <span>Gravity <strong id="gravity-value">0.025</strong></span>
+              <input id="gravity-slider" type="range" min="0.005" max="0.080" step="0.005" value="0.025">
+            </label>
+            <label>
+              <span>Thrust <strong id="thrust-value">0.060</strong></span>
+              <input id="thrust-slider" type="range" min="0.020" max="0.140" step="0.005" value="0.060">
+            </label>
+          </div>
+
           <div class="gravity-stage-wrap">
             <canvas id="gravity-canvas" width="720" height="1040" aria-label="Gravity rocket game"></canvas>
             <div class="gravity-message hidden" id="gravity-message">
