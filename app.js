@@ -924,6 +924,314 @@ function generateRealm(){if("speechSynthesis"in window)window.speechSynthesis.ca
 function checkRealm(){const v=Number(realmAnswer.value.replace("£","").replace(",",".")),ok=Number.isFinite(v)&&Math.abs(v-realmCurrent.answer)<.001;realmFeedback.className=`realm-feedback ${ok?"good":"bad"}`;realmFeedback.textContent=ok?"That’s right! ★":"Not quite — have another go."}
 realmCats.forEach(b=>b.addEventListener("click",()=>{realmCategory=b.dataset.realmCategory;realmCats.forEach(x=>x.classList.toggle("active",x===b));generateRealm()}));realmLevels.forEach(b=>b.addEventListener("click",()=>{realmLevel=b.dataset.realmLevel;realmLevels.forEach(x=>x.classList.toggle("active",x===b));generateRealm()}));$("#realm-check").addEventListener("click",checkRealm);realmAnswer.addEventListener("keydown",e=>{if(e.key==="Enter")checkRealm()});$("#realm-new").addEventListener("click",generateRealm);$("#realm-speak").addEventListener("click",()=>{if(!realmCurrent||!("speechSynthesis"in window))return;window.speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(`${realmCurrent.story} ${realmCurrent.question}`);u.rate=readingSpeechRate;const v=chooseReadingVoice();if(v)u.voice=v;window.speechSynthesis.speak(u)});generateRealm();
 
+
+// ----------------------------
+// Gravity
+// ----------------------------
+const gravityCanvas = $("#gravity-canvas");
+const gravityCtx = gravityCanvas.getContext("2d");
+const gravityLeft = $("#gravity-left");
+const gravityRight = $("#gravity-right");
+const gravityThrust = $("#gravity-thrust");
+const gravityReset = $("#gravity-reset");
+const gravityAgain = $("#gravity-again");
+const gravityMessage = $("#gravity-message");
+const gravityMessageTitle = $("#gravity-message-title");
+const gravityMessageText = $("#gravity-message-text");
+const gravityHeight = $("#gravity-height");
+const gravitySpeed = $("#gravity-speed");
+
+const GW = gravityCanvas.width;
+const GH = gravityCanvas.height;
+
+const gravityInput = {
+  left: false,
+  right: false,
+  thrust: false
+};
+
+const gravityWorld = {
+  gravity: 0.115,
+  thrust: 0.22,
+  rotationSpeed: 0.052,
+  drag: 0.999,
+  maxSpeed: 8.2,
+  running: true
+};
+
+// Hand-built cavern. Each rectangle is a solid wall.
+const gravityWalls = [
+  {x:0, y:0, w:38, h:1040},
+  {x:682, y:0, w:38, h:1040},
+
+  {x:38, y:920, w:185, h:28},
+  {x:500, y:920, w:182, h:28},
+
+  {x:38, y:760, w:210, h:26},
+  {x:405, y:690, w:277, h:26},
+
+  {x:38, y:530, w:270, h:26},
+  {x:470, y:470, w:212, h:26},
+
+  {x:38, y:300, w:190, h:26},
+  {x:370, y:255, w:312, h:26}
+];
+
+const gravityStartPad = {x:282, y:956, w:156, h:18};
+const gravityGoalPad = {x:270, y:92, w:180, h:18};
+
+let rocket;
+
+function resetGravityGame() {
+  rocket = {
+    x: 360,
+    y: 910,
+    vx: 0,
+    vy: 0,
+    angle: 0,
+    radius: 16,
+    landed: false,
+    crashed: false
+  };
+
+  gravityWorld.running = true;
+  gravityInput.left = gravityInput.right = gravityInput.thrust = false;
+  gravityMessage.classList.add("hidden");
+}
+
+function gravityRectCircleCollision(rect, x, y, r) {
+  const cx = Math.max(rect.x, Math.min(x, rect.x + rect.w));
+  const cy = Math.max(rect.y, Math.min(y, rect.y + rect.h));
+  const dx = x - cx;
+  const dy = y - cy;
+  return dx * dx + dy * dy < r * r;
+}
+
+function gravityPadLanding(pad) {
+  const withinX = rocket.x > pad.x + 12 && rocket.x < pad.x + pad.w - 12;
+  const bottom = rocket.y + rocket.radius;
+  const nearTop = bottom >= pad.y - 4 && bottom <= pad.y + 12;
+  return withinX && nearTop;
+}
+
+function crashGravity(reason = "Rocket crashed") {
+  if (!gravityWorld.running) return;
+  gravityWorld.running = false;
+  rocket.crashed = true;
+  gravityMessageTitle.textContent = "Crash!";
+  gravityMessageText.textContent = reason;
+  gravityMessage.classList.remove("hidden");
+}
+
+function winGravity() {
+  if (!gravityWorld.running) return;
+  gravityWorld.running = false;
+  rocket.landed = true;
+  gravityMessageTitle.textContent = "Nice landing!";
+  gravityMessageText.textContent = "You reached the top landing pad.";
+  gravityMessage.classList.remove("hidden");
+}
+
+function updateGravity() {
+  if (!gravityWorld.running) return;
+
+  if (gravityInput.left) rocket.angle -= gravityWorld.rotationSpeed;
+  if (gravityInput.right) rocket.angle += gravityWorld.rotationSpeed;
+
+  if (gravityInput.thrust) {
+    rocket.vx += Math.sin(rocket.angle) * gravityWorld.thrust;
+    rocket.vy -= Math.cos(rocket.angle) * gravityWorld.thrust;
+  }
+
+  rocket.vy += gravityWorld.gravity;
+  rocket.vx *= gravityWorld.drag;
+  rocket.vy *= gravityWorld.drag;
+
+  const speed = Math.hypot(rocket.vx, rocket.vy);
+  if (speed > gravityWorld.maxSpeed) {
+    rocket.vx = rocket.vx / speed * gravityWorld.maxSpeed;
+    rocket.vy = rocket.vy / speed * gravityWorld.maxSpeed;
+  }
+
+  rocket.x += rocket.vx;
+  rocket.y += rocket.vy;
+
+  // World boundaries
+  if (rocket.x < rocket.radius || rocket.x > GW - rocket.radius ||
+      rocket.y < rocket.radius || rocket.y > GH - rocket.radius) {
+    crashGravity("You hit the edge of the cavern.");
+    return;
+  }
+
+  // Goal pad: success only when arriving gently and roughly upright.
+  if (gravityPadLanding(gravityGoalPad)) {
+    const upright = Math.abs(Math.sin(rocket.angle)) < 0.42;
+    const gentle = Math.hypot(rocket.vx, rocket.vy) < 2.7;
+
+    if (upright && gentle) {
+      rocket.y = gravityGoalPad.y - rocket.radius;
+      rocket.vx = rocket.vy = 0;
+      winGravity();
+      return;
+    }
+  }
+
+  // Start pad is safe only at the beginning / gentle touch.
+  if (gravityPadLanding(gravityStartPad) && rocket.vy >= 0 && Math.hypot(rocket.vx, rocket.vy) < 2.8) {
+    rocket.y = gravityStartPad.y - rocket.radius;
+    rocket.vy = Math.min(0, rocket.vy);
+  }
+
+  for (const wall of gravityWalls) {
+    if (gravityRectCircleCollision(wall, rocket.x, rocket.y, rocket.radius)) {
+      crashGravity("You hit the cavern wall.");
+      return;
+    }
+  }
+}
+
+function drawGravityBackground() {
+  const g = gravityCtx.createLinearGradient(0,0,0,GH);
+  g.addColorStop(0,"#111b30");
+  g.addColorStop(1,"#080d17");
+  gravityCtx.fillStyle = g;
+  gravityCtx.fillRect(0,0,GW,GH);
+
+  gravityCtx.fillStyle = "rgba(255,255,255,.13)";
+  for (let i=0;i<36;i++) {
+    const x = (i*137)%GW;
+    const y = (i*211)%GH;
+    gravityCtx.fillRect(x,y,2,2);
+  }
+}
+
+function drawGravityWalls() {
+  gravityCtx.fillStyle = "#293447";
+  gravityCtx.strokeStyle = "#3e4b61";
+  gravityCtx.lineWidth = 2;
+
+  for (const wall of gravityWalls) {
+    gravityCtx.fillRect(wall.x, wall.y, wall.w, wall.h);
+    gravityCtx.strokeRect(wall.x+.5, wall.y+.5, wall.w-1, wall.h-1);
+  }
+}
+
+function drawPad(pad, goal=false) {
+  gravityCtx.fillStyle = goal ? "#6ed28c" : "#7b8da8";
+  gravityCtx.fillRect(pad.x,pad.y,pad.w,pad.h);
+  gravityCtx.fillStyle = goal ? "rgba(110,210,140,.18)" : "rgba(123,141,168,.15)";
+  gravityCtx.fillRect(pad.x,pad.y-22,pad.w,22);
+
+  gravityCtx.fillStyle = goal ? "#9df0b5" : "#b9c5d6";
+  gravityCtx.font = "bold 14px system-ui";
+  gravityCtx.textAlign = "center";
+  gravityCtx.fillText(goal ? "LAND HERE" : "START", pad.x+pad.w/2, pad.y-6);
+}
+
+function drawRocket() {
+  gravityCtx.save();
+  gravityCtx.translate(rocket.x, rocket.y);
+  gravityCtx.rotate(rocket.angle);
+
+  if (gravityInput.thrust && gravityWorld.running) {
+    gravityCtx.beginPath();
+    gravityCtx.moveTo(-7, 13);
+    gravityCtx.lineTo(0, 33 + Math.random()*8);
+    gravityCtx.lineTo(7, 13);
+    gravityCtx.closePath();
+    gravityCtx.fillStyle = "#ffb54f";
+    gravityCtx.fill();
+
+    gravityCtx.beginPath();
+    gravityCtx.moveTo(-4, 13);
+    gravityCtx.lineTo(0, 26 + Math.random()*5);
+    gravityCtx.lineTo(4, 13);
+    gravityCtx.closePath();
+    gravityCtx.fillStyle = "#fff0a0";
+    gravityCtx.fill();
+  }
+
+  gravityCtx.beginPath();
+  gravityCtx.moveTo(0,-20);
+  gravityCtx.lineTo(14,13);
+  gravityCtx.lineTo(0,8);
+  gravityCtx.lineTo(-14,13);
+  gravityCtx.closePath();
+  gravityCtx.fillStyle = "#e9edf3";
+  gravityCtx.fill();
+
+  gravityCtx.beginPath();
+  gravityCtx.arc(0,-3,5,0,Math.PI*2);
+  gravityCtx.fillStyle = "#65b8e8";
+  gravityCtx.fill();
+
+  gravityCtx.restore();
+}
+
+function drawGravity() {
+  drawGravityBackground();
+  drawGravityWalls();
+  drawPad(gravityStartPad,false);
+  drawPad(gravityGoalPad,true);
+  drawRocket();
+
+  const height = Math.max(0, Math.round((gravityStartPad.y - rocket.y) / 8));
+  gravityHeight.textContent = `${height} m`;
+  gravitySpeed.textContent = `${Math.hypot(rocket.vx,rocket.vy).toFixed(1)}`;
+}
+
+let gravityLast = performance.now();
+function gravityLoop(now) {
+  const dt = Math.min(2.2, (now - gravityLast) / 16.667);
+  gravityLast = now;
+
+  // Fixed-ish small integration steps for stability.
+  const steps = Math.max(1, Math.ceil(dt));
+  for (let i=0;i<steps;i++) updateGravity();
+
+  drawGravity();
+  requestAnimationFrame(gravityLoop);
+}
+
+function bindGravityHold(button, key) {
+  const down = e => {
+    e.preventDefault();
+    gravityInput[key] = true;
+    button.classList.add("pressed");
+  };
+  const up = e => {
+    e.preventDefault();
+    gravityInput[key] = false;
+    button.classList.remove("pressed");
+  };
+
+  button.addEventListener("pointerdown", down);
+  button.addEventListener("pointerup", up);
+  button.addEventListener("pointercancel", up);
+  button.addEventListener("pointerleave", up);
+}
+
+bindGravityHold(gravityLeft,"left");
+bindGravityHold(gravityRight,"right");
+bindGravityHold(gravityThrust,"thrust");
+
+document.addEventListener("keydown", e => {
+  if (e.key === "ArrowLeft" || e.key.toLowerCase() === "a") gravityInput.left = true;
+  if (e.key === "ArrowRight" || e.key.toLowerCase() === "d") gravityInput.right = true;
+  if (e.key === "ArrowUp" || e.key === " ") gravityInput.thrust = true;
+});
+document.addEventListener("keyup", e => {
+  if (e.key === "ArrowLeft" || e.key.toLowerCase() === "a") gravityInput.left = false;
+  if (e.key === "ArrowRight" || e.key.toLowerCase() === "d") gravityInput.right = false;
+  if (e.key === "ArrowUp" || e.key === " ") gravityInput.thrust = false;
+});
+
+gravityReset.addEventListener("click", resetGravityGame);
+gravityAgain.addEventListener("click", resetGravityGame);
+
+resetGravityGame();
+requestAnimationFrame(gravityLoop);
+
 // ----------------------------
 // Coding / rover programming
 // ----------------------------
