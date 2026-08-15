@@ -818,6 +818,8 @@ setReadingMode(readingMode);
 const readingSpeakButton = $("#reading-speak");
 const readingSpeakLabel = $("#reading-speak-label");
 const readingSpeedButtons = $$("[data-reading-speed]");
+const readingVoiceSelect = $("#reading-voice-select");
+let readingVoiceKey = localStorage.getItem("readingVoiceKey") || "";
 let readingSpeechRate = Number(localStorage.getItem("readingSpeechRate") || 0.95);
 
 function setReadingSpeechRate(rate) {
@@ -840,13 +842,18 @@ function readingTextForSpeech() {
   return activeReadingTest.sentence.replace("___", " ... ");
 }
 
-function chooseReadingVoice() {
-  if (!("speechSynthesis" in window)) return null;
-  const voices = window.speechSynthesis.getVoices();
-  return voices.find(v => /^en-GB$/i.test(v.lang))
-    || voices.find(v => /^en/i.test(v.lang))
-    || voices[0]
-    || null;
+function readingVoiceId(v){return `${v.name}||${v.lang}`;}
+function populateReadingVoices(){
+  if(!("speechSynthesis" in window))return;
+  const voices=window.speechSynthesis.getVoices().filter(v=>/^en/i.test(v.lang)).sort((a,b)=>(/^en-GB$/i.test(a.lang)?0:1)-(/^en-GB$/i.test(b.lang)?0:1)||a.name.localeCompare(b.name));
+  readingVoiceSelect.innerHTML='<option value="">Default English voice</option>';
+  voices.forEach(v=>{const o=document.createElement("option");o.value=readingVoiceId(v);o.textContent=`${v.name} (${v.lang})`;readingVoiceSelect.appendChild(o);});
+  if([...readingVoiceSelect.options].some(o=>o.value===readingVoiceKey))readingVoiceSelect.value=readingVoiceKey;
+}
+function chooseReadingVoice(){
+  if(!("speechSynthesis" in window))return null;
+  const voices=window.speechSynthesis.getVoices();
+  return (readingVoiceKey&&voices.find(v=>readingVoiceId(v)===readingVoiceKey))||voices.find(v=>/^en-GB$/i.test(v.lang))||voices.find(v=>/^en/i.test(v.lang))||voices[0]||null;
 }
 
 function speakReadingText() {
@@ -892,12 +899,30 @@ readingSpeedButtons.forEach(button => {
   });
 });
 setReadingSpeechRate(readingSpeechRate);
+readingVoiceSelect.addEventListener("change",()=>{stopReadingSpeech();readingVoiceKey=readingVoiceSelect.value;localStorage.setItem("readingVoiceKey",readingVoiceKey);});
+populateReadingVoices();
+if("speechSynthesis" in window)window.speechSynthesis.addEventListener?.("voiceschanged",populateReadingVoices);
 
 tabs.forEach(tab => {
   tab.addEventListener("click", () => {
     if (tab.dataset.screen !== "reading-screen") stopReadingSpeech();
   });
 });
+
+
+// ----------------------------
+// Real World Maths
+// ----------------------------
+const realmStory=$("#realm-story"),realmQuestion=$("#realm-question"),realmAnswer=$("#realm-answer"),realmUnit=$("#realm-unit"),realmFeedback=$("#realm-feedback");
+const realmCats=$$("[data-realm-category]"),realmLevels=$$("[data-realm-level]");let realmCategory="money",realmLevel="easy",realmCurrent;
+const realmNames=["Sam","Mia","Leo","Ava","Noah","Ruby","Ben","Ella","Jack","Sophie"],rpick=a=>a[Math.floor(Math.random()*a.length)],pounds=p=>`£${(p/100).toFixed(2)}`;
+function makeMoney(l){const n=rpick(realmNames),items=[["sandwich",200],["drink",120],["apple",60],["wrap",250],["juice",140],["cake",90]],a=rpick(items),b=rpick(items.filter(x=>x!==a));let p1=a[1],p2=b[1];if(l==="medium"){p1+=rpick([5,10,15,20]);p2+=rpick([5,10,15,20])}if(l==="hard"){p1+=rpick([17,25,35,45]);p2+=rpick([12,28,38,48])}const total=p1+p2,cash=l==="easy"?500:1000,ask=l!=="easy"||Math.random()>.5;return{story:`${n} goes to the shop for lunch. ${n} buys a ${a[0]} for ${pounds(p1)} and a ${b[0]} for ${pounds(p2)}. ${n} has ${pounds(cash)}.`,question:ask?`How much change does ${n} get?`:"How much does the lunch cost altogether?",answer:(ask?cash-total:total)/100,unit:"£"}}
+function makeCooking(l){const n=rpick(realmNames);if(l==="easy"){let e=rpick([50,100,150]),c=rpick([2,3,4]);return{story:`${n} makes ${c} cakes. Each needs ${e} g of mixture.`,question:"How many grams are needed altogether?",answer:e*c,unit:"g"}}if(l==="medium"){let h=rpick([500,750,1000]),u=rpick([150,200,250]);return{story:`${n} has ${h} g of flour and uses ${u} g.`,question:"How many grams are left?",answer:h-u,unit:"g"}}let e=rpick([125,150,175,200]),c=rpick([3,4,5]);return{story:`A recipe needs ${e} g of flour for one batch. ${n} makes ${c} batches.`,question:"How much flour is needed?",answer:e*c,unit:"g"}}
+function makeDistance(l){const n=rpick(realmNames);if(l==="easy"){let a=rpick([100,200,300]),b=rpick([100,200,300]);return{story:`${n} walks ${a} m to the park, then ${b} m to the pond.`,question:"How far altogether?",answer:a+b,unit:"m"}}if(l==="medium"){let t=rpick([1000,1200,1500]),d=rpick([300,400,500]);return{story:`${n} is walking a ${t} m trail and has walked ${d} m.`,question:"How many metres are left?",answer:t-d,unit:"m"}}let k=rpick([2,3,4]),e=rpick([250,500,750]);return{story:`${n} cycles ${k} km, then another ${e} m.`,question:"How far is that altogether in metres?",answer:k*1000+e,unit:"m"}}
+function makeTime(l){const n=rpick(realmNames);if(l==="easy"){let m=rpick([10,15,20,30]);return{story:`${n} reads for ${m} minutes.`,question:`How many minutes does ${n} read for?`,answer:m,unit:"min"}}if(l==="medium"){let h=rpick([1,2]),m=rpick([15,30]);return{story:`${n} travels for ${h} hour${h>1?"s":""} and ${m} minutes.`,question:"How many minutes is that altogether?",answer:h*60+m,unit:"min"}}let d=rpick([45,60,90]);return{story:`${n} starts an activity at 10:00. It lasts ${d} minutes.`,question:"How many minutes long is the activity?",answer:d,unit:"min"}}
+function generateRealm(){if("speechSynthesis"in window)window.speechSynthesis.cancel();realmCurrent=({money:makeMoney,cooking:makeCooking,distance:makeDistance,time:makeTime})[realmCategory](realmLevel);realmStory.textContent=realmCurrent.story;realmQuestion.textContent=realmCurrent.question;realmUnit.textContent=realmCurrent.unit;realmAnswer.value="";realmFeedback.className="realm-feedback";realmFeedback.textContent="Have a go!"}
+function checkRealm(){const v=Number(realmAnswer.value.replace("£","").replace(",",".")),ok=Number.isFinite(v)&&Math.abs(v-realmCurrent.answer)<.001;realmFeedback.className=`realm-feedback ${ok?"good":"bad"}`;realmFeedback.textContent=ok?"That’s right! ★":"Not quite — have another go."}
+realmCats.forEach(b=>b.addEventListener("click",()=>{realmCategory=b.dataset.realmCategory;realmCats.forEach(x=>x.classList.toggle("active",x===b));generateRealm()}));realmLevels.forEach(b=>b.addEventListener("click",()=>{realmLevel=b.dataset.realmLevel;realmLevels.forEach(x=>x.classList.toggle("active",x===b));generateRealm()}));$("#realm-check").addEventListener("click",checkRealm);realmAnswer.addEventListener("keydown",e=>{if(e.key==="Enter")checkRealm()});$("#realm-new").addEventListener("click",generateRealm);$("#realm-speak").addEventListener("click",()=>{if(!realmCurrent||!("speechSynthesis"in window))return;window.speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(`${realmCurrent.story} ${realmCurrent.question}`);u.rate=readingSpeechRate;const v=chooseReadingVoice();if(v)u.voice=v;window.speechSynthesis.speak(u)});generateRealm();
 
 // ----------------------------
 // Coding / rover programming

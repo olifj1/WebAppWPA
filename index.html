@@ -210,6 +210,7 @@
               <span class="reading-speaker-icon">🔊</span>
               <span id="reading-speak-label">Read aloud</span>
             </button>
+            <div class="reading-voice-control"><span>Voice</span><select id="reading-voice-select"><option value="">Default voice</option></select></div>
             <div class="reading-speed-control">
               <span>Voice speed</span>
               <div class="reading-speed-buttons" role="group" aria-label="Reading voice speed">
@@ -222,6 +223,16 @@
           <button class="primary-action reading-next" id="new-reading">New Sentence</button>
         </div>
       </section>
+
+      <!-- REAL WORLD MATHS -->
+      <section class="screen" id="realmaths-screen"><div class="page realm-page">
+      <header class="page-header"><p class="kicker">LEARNING PLAY</p><h1>Real World Maths</h1><p class="subhead">Use maths to solve everyday problems.</p></header>
+      <div class="realm-categories"><button class="realm-category active" data-realm-category="money">💷<span>Money</span></button><button class="realm-category" data-realm-category="cooking">⚖️<span>Cooking</span></button><button class="realm-category" data-realm-category="distance">📏<span>Distance</span></button><button class="realm-category" data-realm-category="time">⏱️<span>Time</span></button></div>
+      <div class="realm-levels"><button class="realm-level active" data-realm-level="easy">Easy</button><button class="realm-level" data-realm-level="medium">Medium</button><button class="realm-level" data-realm-level="hard">Hard</button></div>
+      <div class="realm-card"><div class="realm-story" id="realm-story"></div><button class="realm-speak" id="realm-speak">🔊 Read question</button></div>
+      <div class="realm-question" id="realm-question"></div><div class="realm-answer-row"><input id="realm-answer" inputmode="decimal" placeholder="Your answer"><span id="realm-unit"></span><button id="realm-check">Check</button></div>
+      <div class="realm-feedback" id="realm-feedback">Have a go!</div><button class="primary-action" id="realm-new">New Question</button>
+      </div></section>
 
       <!-- CODING -->
       <section class="screen" id="coding-screen" aria-labelledby="coding-title">
@@ -372,6 +383,7 @@
       <button class="tab" data-screen="clock-screen"><span class="tab-icon clock-icon">◷</span><span>Clock</span></button>
       <button class="tab" data-screen="sums-screen"><span class="tab-icon sum-icon">+</span><span>Sums</span></button>
       <button class="tab" data-screen="reading-screen"><span class="tab-icon reading-icon">Aa</span><span>Reading</span></button>
+      <button class="tab" data-screen="realmaths-screen"><span class="tab-icon">🛒</span><span class="tab-label">Real Maths</span></button>
       <button class="tab" data-screen="coding-screen"><span class="tab-icon coding-icon">&lt;/&gt;</span><span>Coding</span></button>
       <button class="tab" data-screen="laser-screen"><span class="tab-icon laser-tab-icon">⌁</span><span>Laser</span></button>
     </nav>
